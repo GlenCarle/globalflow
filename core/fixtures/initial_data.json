@@ -1,0 +1,44 @@
+[
+  {
+    "model": "core.traveltype",
+    "pk": 1,
+    "fields": {
+      "name": "Visa"
+    }
+  },
+  {
+    "model": "core.traveltype",
+    "pk": 2,
+    "fields": {
+      "name": "Billet d’avion"
+    }
+  },
+  {
+    "model": "core.traveltype",
+    "pk": 3,
+    "fields": {
+      "name": "Assurance voyage"
+    }
+  },
+  {
+    "model": "core.document",
+    "pk": 1,
+    "fields": {
+      "name": "Passeport"
+    }
+  },
+  {
+    "model": "core.document",
+    "pk": 2,
+    "fields": {
+      "name": "Carte Nationale d’Identité"
+    }
+  },
+  {
+    "model": "core.document",
+    "pk": 3,
+    "fields": {
+      "name": "Acte de naissance"
+    }
+  }
+]
