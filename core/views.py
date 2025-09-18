@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # SimpleJWT
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -17,7 +18,7 @@ from .permissions import IsAdmin, IsAgent
 
 
 # --- API Clients ---
-class ClientViewSet(viewsets.ModelViewSet):
+class ClientViewSet(viewsets.ModelViewSet):   # vIEW QUI PERMET DE GERER LES CLIENTS
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -59,8 +60,11 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        print("Données reçues:", request.data)  # Pour le débogage
         serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            print("Erreurs de validation:", serializer.errors)  # Pour le débogage
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         user = serializer.save()
 
         # Génération automatique des tokens JWT
@@ -98,3 +102,34 @@ class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+# --- User Info ---
+class UserProfileView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            if not user or not user.is_authenticated:
+                return Response(
+                    {'error': 'Utilisateur non authentifié'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+                
+            return Response({
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_staff': user.is_staff,
+                'is_active': user.is_active,
+                'date_joined': user.date_joined,
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

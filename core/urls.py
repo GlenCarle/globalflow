@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenBlacklistView,
 )
-from .views import ClientViewSet, home, ClientListView, RegisterView, api_root, TravelTypeViewSet, DocumentViewSet
+from .views import ClientViewSet, home, ClientListView, RegisterView, api_root, TravelTypeViewSet, DocumentViewSet, UserProfileView
 
 # Router DRF
 router = DefaultRouter()
@@ -29,6 +29,7 @@ urlpatterns = [
     # Authentification
     path("api/register/", RegisterView.as_view(), name="register"),           # Inscription + tokens auto
     path("api/login/", TokenObtainPairView.as_view(), name="token_obtain"),   # Connexion
+    path("api/users/me/", UserProfileView.as_view(), name='user-profile'),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"), # Rafraîchir token
     path("api/logout/", TokenBlacklistView.as_view(), name="token_blacklist"),   # Déconnexion
 ]
