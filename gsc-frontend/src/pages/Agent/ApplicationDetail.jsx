@@ -45,7 +45,7 @@ const getStatusBadge = (status) => {
       return <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-300">Brouillon</Badge>;
     case 'submitted':
       return <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">Soumis</Badge>;
-    case 'in_review':
+    case 'under_review':
       return <Badge variant="outline" className="border-purple-500 text-purple-600 dark:text-purple-400">En cours</Badge>;
     case 'approved':
       return <Badge variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Approuvé</Badge>;
@@ -61,7 +61,7 @@ const getStatusBadge = (status) => {
 const statuses = [
   { value: 'draft', label: 'Brouillon' },
   { value: 'submitted', label: 'Soumis' },
-  { value: 'in_review', label: 'En cours de traitement' },
+  { value: 'under_review', label: 'En cours d\'examen' },
   { value: 'approved', label: 'Approuvé' },
   { value: 'rejected', label: 'Rejeté' },
   { value: 'cancelled', label: 'Annulé' },

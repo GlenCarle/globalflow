@@ -194,7 +194,7 @@ class VisaApplicationListSerializer(serializers.ModelSerializer):
             'id', 'application_number', 'status', 'status_display', 'priority', 'priority_display',
             'visa_type', 'visa_type_name', 'country_name', 'applicant_name', 'full_name',
             'nationality', 'purpose', 'travel_dates', 'created_at', 'updated_at',
-            'documents_completed', 'total_documents', 'completeness_percentage', 'is_complete', 'missing_documents',
+            'documents', 'documents_completed', 'total_documents', 'completeness_percentage', 'is_complete', 'missing_documents',
             'days_since_created', 'payment_status', 'payment_status_display', 'total_amount', 'assigned_agent'
         ]
         read_only_fields = ['application_number', 'created_at', 'updated_at']

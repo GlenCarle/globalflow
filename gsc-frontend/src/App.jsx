@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { PUBLIC_ROUTES, CLIENT_ROUTES, AGENT_ROUTES, ADMIN_ROUTES, ERROR_ROUTES } from './constants/routes';
 
 // Layouts
@@ -48,6 +49,7 @@ const MyApplicationsPage = lazy(() => import('./pages/User/MyApplications'));
 // Commenting out non-existent imports for now
 // const ApplicationDetailPage = lazy(() => import('./pages/User/ApplicationDetail'));
 const VisaApplicationPage = lazy(() => import('./pages/VisaApplication'));
+const DuplicateVisaApplication = lazy(() => import('./pages/DuplicateVisaApplication'));
 // const MyBookingsPage = lazy(() => import('./pages/User/MyBookings'));
 // const MyAppointmentsPage = lazy(() => import('./pages/User/MyAppointments'));
 // const DocumentsHubPage = lazy(() => import('./pages/User/DocumentsHub'));
@@ -128,6 +130,7 @@ function App() {
             <Route path={CLIENT_ROUTES.APPLICATIONS} element={<MyApplicationsPage />} />
             <Route path={CLIENT_ROUTES.VISA_APPLICATIONS_NEW} element={<VisaApplicationPage />} />
             <Route path={CLIENT_ROUTES.VISA_APPLICATION_DETAIL} element={<VisaApplicationPage />} />
+            <Route path={CLIENT_ROUTES.VISA_APPLICATION_DUPLICATE} element={<DuplicateVisaApplication />} />
             <Route path={CLIENT_ROUTES.BOOKINGS} element={<MyBookingsPage />} />
             <Route path="/booking/:id" element={<BookingDetailsPage />} />
             <Route path="/payment/:bookingId" element={<PaymentPage />} />
@@ -199,7 +202,9 @@ function App() {
 const AppWithProviders = () => (
   <ThemeProvider>
     <AuthProvider>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </AuthProvider>
   </ThemeProvider>
 );

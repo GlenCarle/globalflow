@@ -6,10 +6,10 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Alert } from '../ui/Alert';
 import { loginSchema } from '../../lib/validations/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { CLIENT_ROUTES, PUBLIC_ROUTES } from '../../constants/routes';
+import NotificationToast from '../NotificationToast';
 
 /**
  * Login form component
@@ -17,13 +17,23 @@ import { CLIENT_ROUTES, PUBLIC_ROUTES } from '../../constants/routes';
  */
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [serverError, setServerError] = useState('');
+  const [toast, setToast] = useState({ message: '', type: '', visible: false });
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Get the return URL from location state or default to dashboard
   const from = location.state?.from || CLIENT_ROUTES.DASHBOARD;
+
+  // Show error toast
+  const showErrorToast = (message) => {
+    setToast({ message, type: 'error', visible: true });
+  };
+
+  // Hide toast
+  const hideToast = () => {
+    setToast({ message: '', type: '', visible: false });
+  };
 
   // Initialize React Hook Form with Zod validation
   const {
@@ -39,33 +49,47 @@ const LoginForm = () => {
   });
 
   // Form submission handler
-  const onSubmit = async (data) => {
-    setServerError('');
+  const onSubmit = async (data, e) => {
+    // Prevent default form submission behavior (page reload)
+    if (e) {
+      e.preventDefault();
+    }
 
     try {
       const result = await login(data.email, data.password);
 
       if (result.success) {
+        // Hide any existing toast
+        hideToast();
         // Redirect to the page the user was trying to access or dashboard
         navigate(from, { replace: true });
       } else {
-        setServerError(result.error || 'Identifiants incorrects. Veuillez réessayer.');
+        showErrorToast(result.error || 'Identifiants incorrects. Veuillez réessayer.');
       }
     } catch (error) {
-      setServerError('Une erreur est survenue. Veuillez réessayer plus tard.');
+      showErrorToast('Une erreur est survenue. Veuillez réessayer plus tard.');
       console.error('Login error:', error);
     }
   };
 
   return (
-    <form className="space-y-8 bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-8 border border-blue-100 dark:border-gray-800 animate-fade-in" onSubmit={handleSubmit(onSubmit)}>
-      <div className="flex items-center gap-3 mb-6">
-        <span className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3">
-          <LogIn className="h-7 w-7 text-primary" />
-        </span>
-        <h2 className="text-2xl font-bold text-primary">Connexion à votre espace</h2>
-      </div>
-      {serverError && <Alert variant="error">{serverError}</Alert>}
+    <div className="relative">
+      {toast.visible && (
+        <div className="absolute -top-24 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-md">
+          <NotificationToast
+            message={toast.message}
+            type={toast.type}
+            onClose={hideToast}
+          />
+        </div>
+      )}
+      <form className="space-y-8 bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-8 border border-blue-100 dark:border-gray-800 animate-fade-in" onSubmit={handleSubmit(onSubmit)}>
+        <div className="flex items-center gap-3 mb-6">
+          <span className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3">
+            <LogIn className="h-7 w-7 text-primary" />
+          </span>
+          <h2 className="text-2xl font-bold text-primary">Connexion à votre espace</h2>
+        </div>
       <div className="grid grid-cols-1 gap-6">
         <div>
           <label className="block mb-1 font-semibold text-gray-700 dark:text-gray-200">Email</label>
@@ -94,6 +118,7 @@ const LoginForm = () => {
         </Button>
       </div>
     </form>
+    </div>
   );
 };
 

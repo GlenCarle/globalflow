@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, Clock, User, Calendar, MapPin, Users, Plane, Plus } from 'lucide-react';
+import { CheckCircle, Clock, User, Calendar, MapPin, Users, Plane, Plus, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -12,6 +12,14 @@ export default function BookingsManagement() {
   const [bookings, setBookings] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
+
+  // Modal states
+  const [cancelModal, setCancelModal] = useState({ open: false, booking: null });
+  const [deleteModal, setDeleteModal] = useState({ open: false, booking: null });
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     fetchBookings();
@@ -43,25 +51,102 @@ export default function BookingsManagement() {
   };
 
   const handleValidateBooking = async (bookingId) => {
-    try {
-      await api.post(`/travel/api/travel-bookings/${bookingId}/validate_booking/`);
-      fetchBookings(); // Refresh data
-      alert('Réservation validée avec succès');
-    } catch (error) {
-      console.error('Error validating booking:', error);
-      alert('Erreur lors de la validation de la réservation');
-    }
-  };
+   try {
+     setActionLoading(true);
+     setActionError(null);
+     await api.post(`/travel/api/travel-bookings/${bookingId}/validate_booking/`);
+     fetchBookings(); // Refresh data
+     alert('Réservation validée avec succès');
+   } catch (error) {
+     console.error('Error validating booking:', error);
+     const errorMessage = error.response?.data?.error || 'Erreur lors de la validation de la réservation';
+     setActionError(errorMessage);
+   } finally {
+     setActionLoading(false);
+   }
+ };
 
   const handleAssignAgent = async (bookingId) => {
     try {
+      setActionLoading(true);
+      setActionError(null);
       await api.post(`/travel/api/travel-bookings/${bookingId}/assign_agent/`);
       fetchBookings(); // Refresh data
       alert('Réservation assignée avec succès');
     } catch (error) {
       console.error('Error assigning booking:', error);
-      alert('Erreur lors de l\'assignation de la réservation');
+      const errorMessage = error.response?.data?.error || 'Erreur lors de l\'assignation de la réservation';
+      setActionError(errorMessage);
+    } finally {
+      setActionLoading(false);
     }
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancelModal.booking || !cancelReason.trim()) return;
+
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      await api.post(`/travel/api/travel-bookings/${cancelModal.booking.id}/cancel/`, {
+        reason: cancelReason
+      });
+
+      await fetchBookings();
+      setCancelModal({ open: false, booking: null });
+      setCancelReason('');
+      alert('Réservation annulée avec succès');
+    } catch (error) {
+      console.error('Error canceling booking:', error);
+      const errorMessage = error.response?.data?.error || 'Erreur lors de l\'annulation de la réservation';
+      setActionError(errorMessage);
+      // Don't close modal on error so user can retry
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteBooking = async () => {
+    if (!deleteModal.booking) return;
+
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      await api.delete(`/travel/api/travel-bookings/${deleteModal.booking.id}/`);
+
+      await fetchBookings();
+      setDeleteModal({ open: false, booking: null });
+      alert('Réservation supprimée avec succès');
+    } catch (error) {
+      console.error('Error deleting booking:', error);
+      const errorMessage = error.response?.data?.error || 'Erreur lors de la suppression de la réservation';
+      setActionError(errorMessage);
+      // Don't close modal on error so user can retry
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openCancelModal = (booking) => {
+    setCancelModal({ open: true, booking });
+    setCancelReason('');
+    setActionError(null);
+  };
+
+  const openDeleteModal = (booking) => {
+    setDeleteModal({ open: true, booking });
+    setActionError(null);
+  };
+
+  const closeCancelModal = () => {
+    setCancelModal({ open: false, booking: null });
+    setCancelReason('');
+    setActionError(null);
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModal({ open: false, booking: null });
+    setActionError(null);
   };
 
   const getStatusBadge = (status) => {
@@ -104,6 +189,15 @@ export default function BookingsManagement() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto py-10 text-center">
+        <p className="text-red-600 text-lg mb-6">{error}</p>
+        <Button onClick={fetchBookings}>Réessayer</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
@@ -111,6 +205,23 @@ export default function BookingsManagement() {
         <p className="text-gray-600 dark:text-gray-400 mt-2">
           Gérez les réservations payées, validez les demandes et planifiez les rendez-vous
         </p>
+
+        {/* Error Display */}
+        {actionError && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <div className="flex">
+              <AlertTriangle className="h-5 w-5 text-red-400" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                  Erreur
+                </h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  {actionError}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -335,6 +446,7 @@ export default function BookingsManagement() {
                               onClick={() => handleAssignAgent(booking.id)}
                               variant="outline"
                               className="text-xs"
+                              disabled={actionLoading}
                             >
                               M'assigner
                             </Button>
@@ -344,6 +456,7 @@ export default function BookingsManagement() {
                               size="sm"
                               onClick={() => handleValidateBooking(booking.id)}
                               className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              disabled={actionLoading}
                             >
                               <CheckCircle className="h-3 w-3 mr-1" />
                               Valider
@@ -354,6 +467,32 @@ export default function BookingsManagement() {
                               Terminée
                             </Badge>
                           )}
+
+                          {/* Cancel/Delete buttons based on status */}
+                          {booking.statut === 'pending_payment' ? (
+                            <Button
+                              size="sm"
+                              onClick={() => openCancelModal(booking)}
+                              variant="destructive"
+                              className="text-xs gap-1"
+                              disabled={actionLoading}
+                            >
+                              <X className="h-3 w-3" />
+                              Annuler
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => openDeleteModal(booking)}
+                              variant="outline"
+                              className="text-xs gap-1 border-red-200 text-red-700 hover:bg-red-50"
+                              disabled={actionLoading}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Supprimer
+                            </Button>
+                          )}
+
                           <Link to={`${AGENT_ROUTES.APPOINTMENTS}?booking=${booking.id}&client=${booking.user?.id}`}>
                             <Button
                               size="sm"
@@ -363,6 +502,7 @@ export default function BookingsManagement() {
                                   ? "border-green-200 text-green-700"
                                   : "bg-blue-600 hover:bg-blue-700 text-white"
                               }`}
+                              disabled={actionLoading}
                             >
                               {hasAppointment(booking.id) ? (
                                 <>
@@ -387,6 +527,78 @@ export default function BookingsManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Cancel Modal */}
+      {cancelModal.open && cancelModal.booking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="h-6 w-6 text-orange-600" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Annuler la réservation</h3>
+            </div>
+
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Êtes-vous sûr de vouloir annuler la réservation pour <strong>{cancelModal.booking.destination}</strong> ?
+            </p>
+
+            <textarea
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              placeholder="Veuillez indiquer le motif de l'annulation..."
+              className="w-full min-h-[90px] rounded-md border border-gray-300 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 resize-none mb-6"
+              required
+            />
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={closeCancelModal} disabled={actionLoading}>
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCancelBooking}
+                disabled={!cancelReason.trim() || actionLoading}
+              >
+                {actionLoading ? 'Annulation...' : 'Confirmer l\'annulation'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {deleteModal.open && deleteModal.booking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Supprimer la réservation</h3>
+            </div>
+
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Êtes-vous sûr de vouloir supprimer définitivement la réservation pour <strong>{deleteModal.booking.destination}</strong> ?
+            </p>
+
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3 mb-6">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                <strong>Attention :</strong> Cette action est irréversible. La réservation sera supprimée définitivement.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={closeDeleteModal} disabled={actionLoading}>
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteBooking}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Suppression...' : 'Supprimer définitivement'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

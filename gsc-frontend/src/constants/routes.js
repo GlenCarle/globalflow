@@ -43,6 +43,7 @@ export const CLIENT_ROUTES = {
   VISA_APPLICATIONS: '/dashboard/visa-applications',
   VISA_APPLICATIONS_NEW: '/dashboard/visa-applications/new',
   VISA_APPLICATION_DETAIL: '/dashboard/visa-applications/:id',
+  VISA_APPLICATION_DUPLICATE: '/dashboard/visa-applications/duplicate',
   
   // Bookings & Appointments
   BOOKINGS: '/dashboard/bookings',

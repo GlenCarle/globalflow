@@ -411,6 +411,18 @@ const VisaApplication = () => {
         }
       }
 
+      // Check if this is a duplicate application error
+      if (error.response?.status === 400 && error.response?.data?.error &&
+          error.response.data.error.includes('déjà une demande en cours')) {
+        // Redirect to duplicate application page with error message
+        navigate(CLIENT_ROUTES.VISA_APPLICATION_DUPLICATE, {
+          state: {
+            errorMessage: error.response.data.error
+          }
+        });
+        return;
+      }
+
       setError(errorMessage);
     } finally {
       setSaving(false);

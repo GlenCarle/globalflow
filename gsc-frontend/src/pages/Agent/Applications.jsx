@@ -60,7 +60,7 @@ const statuses = [
   { value: 'all', label: 'Tous les statuts' },
   { value: 'draft', label: 'Brouillon' },
   { value: 'submitted', label: 'Soumis' },
-  { value: 'in_review', label: 'En cours de traitement' },
+  { value: 'under_review', label: 'En cours d\'examen' },
   { value: 'approved', label: 'Approuvé' },
   { value: 'rejected', label: 'Rejeté' },
   { value: 'cancelled', label: 'Annulé' },
@@ -71,7 +71,7 @@ const getStatusBadge = (status) => {
   const variants = {
     draft: { variant: 'secondary', text: 'Brouillon' },
     submitted: { variant: 'default', text: 'Soumis' },
-    in_review: { variant: 'warning', text: 'En cours' },
+    under_review: { variant: 'warning', text: 'En cours' },
     approved: { variant: 'success', text: 'Approuvé' },
     rejected: { variant: 'destructive', text: 'Rejeté' },
     cancelled: { variant: 'outline', text: 'Annulé' }
@@ -98,7 +98,12 @@ const ApplicationsPage = () => {
       setLoading(true);
       setError(null);
       const response = await axios.get('/travel/api/visa-applications/');
-      
+
+      // Debug: Log the first application to see the API response structure
+      if (response.data.length > 0) {
+        console.log('API Response for first application:', response.data[0]);
+      }
+
       // Transform the data to match our UI needs
       const formattedApplications = response.data.map(app => ({
         id: app.id,
@@ -109,7 +114,7 @@ const ApplicationsPage = () => {
         status: app.status || 'draft',
         createdAt: app.created_at,
         updatedAt: app.updated_at,
-        documents: app.documents || [],
+        documents: Array.isArray(app.documents) ? app.documents : [],
         // Include all original data for the detail view
         ...app
       }));
