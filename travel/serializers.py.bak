@@ -1,0 +1,203 @@
+from rest_framework import serializers
+from .models import (
+    Country, VisaType, RequiredDocument, VisaApplication,
+    ApplicationDocument, ApplicationHistory,
+    DossierVoyage, DocumentVoyage
+)
+
+# Country Serializer
+class CountrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Country
+        fields = '__all__'
+
+# Visa Type Serializer
+class VisaTypeSerializer(serializers.ModelSerializer):
+    country_name = serializers.CharField(source='country.name', read_only=True)
+    required_documents_count = serializers.SerializerMethodField()
+    
+    # Champs calculés pour la compatibilité
+    processing_time_days = serializers.SerializerMethodField()
+    fees = serializers.DecimalField(source='service_fee', max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = VisaType
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+        
+    def get_processing_time_days(self, obj):
+        # Retourne une estimation du temps de traitement
+        if obj.min_processing_days and obj.max_processing_days:
+            if obj.min_processing_days == obj.max_processing_days:
+                return f"{obj.min_processing_days} jours"
+            return f"{obj.min_processing_days}-{obj.max_processing_days} jours"
+        return None
+
+    def get_required_documents_count(self, obj):
+        return obj.required_documents.count()
+
+# Required Document Serializer
+class RequiredDocumentSerializer(serializers.ModelSerializer):
+    visa_type_name = serializers.CharField(source='visa_type.name', read_only=True)
+
+    class Meta:
+        model = RequiredDocument
+        fields = '__all__'
+
+# Application Document Serializer
+class ApplicationDocumentSerializer(serializers.ModelSerializer):
+    document_name = serializers.CharField(source='required_document.name', read_only=True)
+    document_type = serializers.CharField(source='required_document.document_type', read_only=True)
+    is_mandatory = serializers.BooleanField(source='required_document.is_mandatory', read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ApplicationDocument
+        fields = '__all__'
+        read_only_fields = ['uploaded_at', 'reviewed_at']
+
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+        return None
+
+# Application History Serializer
+class ApplicationHistorySerializer(serializers.ModelSerializer):
+    performed_by_name = serializers.CharField(source='performed_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = ApplicationHistory
+        fields = '__all__'
+
+# Visa Application Serializer
+class VisaApplicationSerializer(serializers.ModelSerializer):
+    visa_type_name = serializers.CharField(source='visa_type.name', read_only=True)
+    country_name = serializers.CharField(source='visa_type.country.name', read_only=True)
+    applicant_name = serializers.SerializerMethodField()
+    assigned_agent_name = serializers.CharField(source='assigned_agent.get_full_name', read_only=True, allow_null=True)
+    documents = ApplicationDocumentSerializer(many=True, read_only=True)
+    recent_history = ApplicationHistorySerializer(source='history', many=True, read_only=True)
+    
+    # Champs calculés
+    full_name = serializers.SerializerMethodField()
+    age = serializers.SerializerMethodField()
+    
+    # Champs imbriqués
+    country_of_birth_name = serializers.CharField(source='country_of_birth.name', read_only=True)
+    residence_country_name = serializers.CharField(source='country.name', read_only=True)
+    passport_issue_country_name = serializers.CharField(source='passport_issue_country.name', read_only=True)
+    
+    # Champs pour la compatibilité
+    processing_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, source='application_fee')
+    
+    class Meta:
+        model = VisaApplication
+        fields = '__all__'
+        read_only_fields = [
+            'application_number', 'submitted_at', 'reviewed_at',
+            'approved_at', 'rejected_at', 'created_at', 'updated_at',
+            'under_review_at', 'additional_info_requested_at', 'completed_at',
+            'payment_received_at'
+        ]
+        extra_kwargs = {
+            'user': {'required': False},
+            'applicant': {'required': False},
+        }
+
+    def get_applicant_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+
+# Visa Application Create/Update Serializer (for draft saving)
+class VisaApplicationDraftSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VisaApplication
+        fields = '__all__'
+        read_only_fields = [
+            'application_number', 'submitted_at', 'reviewed_at',
+            'approved_at', 'rejected_at', 'created_at', 'updated_at',
+            'under_review_at', 'additional_info_requested_at', 'completed_at',
+            'payment_received_at', 'payment_status', 'payment_reference'
+        ]
+        extra_kwargs = {
+            'user': {'required': False},
+            'applicant': {'required': False},
+        }
+
+# Visa Application List Serializer (for dashboard)
+class VisaApplicationListSerializer(serializers.ModelSerializer):
+    visa_type_name = serializers.CharField(source='visa_type.name', read_only=True)
+    country_name = serializers.CharField(source='visa_type.country.name', read_only=True)
+    applicant_name = serializers.SerializerMethodField()
+    days_since_created = serializers.SerializerMethodField()
+    documents_completed = serializers.SerializerMethodField()
+    total_documents = serializers.SerializerMethodField()
+    
+    # Champs additionnels pour le tableau de bord
+    full_name = serializers.SerializerMethodField()
+    nationality = serializers.CharField(source='nationality', read_only=True)
+    purpose = serializers.CharField(source='purpose_of_visit', read_only=True)
+    travel_dates = serializers.SerializerMethodField()
+    
+    # Champs de statut
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    
+    # Champs de paiement
+    payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
+    total_amount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VisaApplication
+        fields = [
+            'id', 'application_number', 'status', 'status_display', 'priority', 'priority_display',
+            'visa_type', 'visa_type_name', 'country_name', 'applicant_name', 'full_name',
+            'nationality', 'purpose', 'travel_dates', 'created_at', 'updated_at',
+            'documents_completed', 'total_documents', 'days_since_created',
+            'payment_status', 'payment_status_display', 'total_amount', 'assigned_agent'
+        ]
+        read_only_fields = ['application_number', 'created_at', 'updated_at']
+
+    def get_applicant_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+
+    def get_days_since_created(self, obj):
+        from django.utils import timezone
+        return (timezone.now().date() - obj.created_at.date()).days if obj.created_at else 0
+
+    def get_full_name(self, obj):
+        names = [obj.first_name]
+        if obj.middle_name:
+            names.append(obj.middle_name)
+        names.append(obj.last_name)
+        return ' '.join(filter(None, names))
+
+    def get_travel_dates(self, obj):
+        if obj.intended_date_of_arrival and obj.intended_date_of_departure:
+            return f"{obj.intended_date_of_arrival.strftime('%d/%m/%Y')} - {obj.intended_date_of_departure.strftime('%d/%m/%Y')}"
+        return None
+
+    def get_total_amount(self, obj):
+        if obj.total_amount:
+            return f"{obj.total_amount} {obj.visa_type.currency if obj.visa_type else 'USD'}"
+        return None
+
+    def get_documents_completed(self, obj):
+        return obj.documents.filter(status__in=['submitted', 'approved']).count()
+
+    def get_total_documents(self, obj):
+        return obj.documents.count()
+
+# Legacy serializers (keeping for backward compatibility)
+class DocumentVoyageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DocumentVoyage
+        fields = "__all__"
+
+class DossierVoyageSerializer(serializers.ModelSerializer):
+    documents = DocumentVoyageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DossierVoyage
+        fields = "__all__"

@@ -133,7 +133,7 @@ class AuthService {
     }
     
     try {
-      const response = await api.post('/refresh/', {
+      const response = await api.post('/token/refresh/', {
         refresh: tokens.refresh,
       });
       

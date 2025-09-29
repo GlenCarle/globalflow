@@ -42,7 +42,7 @@ const Sidebar = ({ className }) => {
       {
         title: 'Mes demandes',
         icon: <FileText className="h-5 w-5" />,
-        href: '/dashboard/applications',
+        href: '/dashboard/my-applications',
       },
       {
         title: 'Mes réservations',
@@ -85,7 +85,7 @@ const Sidebar = ({ className }) => {
       {
         title: 'Dossiers clients',
         icon: <Briefcase className="h-5 w-5" />,
-        href: '/agent/cases',
+        href: '/agent/applications',
       },
       {
         title: 'Rendez-vous',
@@ -143,7 +143,7 @@ const Sidebar = ({ className }) => {
     ];
 
     // Return appropriate items based on user role
-    if (!user) return clientItems;
+    if (!user) return clientItems; // If no user, return to home
     
     switch (user.role) {
       case 'admin':

@@ -1,0 +1,717 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Eye, 
+  Download, 
+  CheckCircle, 
+  Clock, 
+  XCircle, 
+  Calendar, 
+  Search, 
+  Filter, 
+  ChevronDown,
+  FileText,
+  AlertCircle,
+  Check,
+  X,
+  User,
+  Mail,
+  Phone,
+  Calendar as CalendarIcon,
+  File,
+  MapPin,
+  Globe,
+  Clock as ClockIcon,
+  UserCheck,
+  UserX,
+  CheckSquare,
+  XSquare
+} from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/Popover';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Calendar as CalendarComponent } from '../../components/ui/Calendar';
+import { cn } from '../../lib/utils';
+import axios from '../../lib/axios';
+
+// Helper function to get CSRF token
+const getCookie = (name) => {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
+
+const statuses = [
+  { value: 'all', label: 'Tous les statuts' },
+  { value: 'draft', label: 'Brouillon' },
+  { value: 'submitted', label: 'Soumis' },
+  { value: 'in_review', label: 'En cours de traitement' },
+  { value: 'approved', label: 'Approuvé' },
+  { value: 'rejected', label: 'Rejeté' },
+  { value: 'cancelled', label: 'Annulé' },
+];
+
+const RequestDetailModal = ({ request, onClose, onStatusChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [status, setStatus] = useState(request.status);
+  const [notes, setNotes] = useState(request.notes || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      const response = await axios.patch(`/agent/requests/${request.id}/`, { 
+        status, 
+        notes 
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        }
+      });
+      onStatusChange({ ...request, ...response.data });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating request:', error);
+      // Show error message to user
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Format client name from user data
+  const clientName = request.client?.user 
+    ? `${request.client.user.first_name} ${request.client.user.last_name}`.trim()
+    : 'Client inconnu';
+    
+  const clientEmail = request.client?.user?.email || 'Non spécifié';
+  const clientPhone = request.client?.phone_number || 'Non spécifié';
+
+  return (
+    <Dialog open={!!request} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 rounded-lg shadow-xl">
+        <DialogHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">Détails de la demande</DialogTitle>
+              <DialogDescription className="mt-1 text-gray-600 dark:text-gray-300">
+                ID: <span className="font-mono">{request.id}</span> • Créée le {format(new Date(request.createdAt), 'PPP', { locale: fr })}
+              </DialogDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              {isEditing ? (
+                <Button variant="outline" onClick={() => setIsEditing(false)} size="sm">
+                  Annuler
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => setIsEditing(true)} size="sm">
+                  Modifier
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-6 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                <User className="h-5 w-5 mr-2 text-gray-500" />
+                Informations du client
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Nom complet</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white">{clientName}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white">{clientEmail}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Téléphone</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white">{clientPhone}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Date de naissance</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white">
+                    {request.clientDob ? format(new Date(request.clientDob), 'PPP', { locale: fr }) : 'Non spécifiée'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                <FileText className="h-5 w-5 mr-2 text-gray-500" />
+                Détails de la demande
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Type de demande</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white capitalize">
+                    {request.travel_type?.name || 'Type non spécifié'}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Date de soumission</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white flex items-center">
+                    <CalendarIcon className="h-4 w-4 mr-2 text-gray-500" />
+                    {format(new Date(request.createdAt), 'PPPPp', { locale: fr })}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Dernière mise à jour</h4>
+                  <p className="mt-1 text-gray-900 dark:text-white flex items-center">
+                    <ClockIcon className="h-4 w-4 mr-2 text-gray-500" />
+                    {format(new Date(request.updatedAt || request.createdAt), 'PPPPp', { locale: fr })}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Statut</h4>
+                  <div className="mt-2">
+                    {isEditing ? (
+                      <Select value={status} onValueChange={setStatus}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Sélectionner un statut" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses
+                            .filter(s => s.value !== 'all')
+                            .map((s) => (
+                              <SelectItem key={s.value} value={s.value}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center">
+                        {getStatusBadge(request.status)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+            <File className="h-5 w-5 mr-2 text-gray-500" />
+            Documents et pièces jointes
+          </h3>
+          <div className="space-y-4">
+            {request.documents?.length > 0 ? (
+              <div className="space-y-2">
+                {request.documents.map((doc, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center">
+                      <File className="h-5 w-5 text-gray-500 mr-3" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {doc.name || `Document ${index + 1}`}
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-primary" asChild>
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer" download>
+                        <Download className="h-4 w-4 mr-1" /> Télécharger
+                      </a>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <FileText className="h-10 w-10 mx-auto text-gray-400" />
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Aucun document joint</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {(request.notes || isEditing) && (
+          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-gray-500" />
+              Notes
+            </h3>
+            {isEditing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full min-h-[100px] p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  placeholder="Ajoutez des notes sur cette demande..."
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    Annuler
+                  </Button>
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="prose dark:prose-invert max-w-none">
+                {request.notes ? (
+                  <p className="whitespace-pre-line">{request.notes}</p>
+                ) : (
+                  <p className="text-gray-500 dark:text-gray-400 italic">Aucune note pour le moment</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="flex justify-between w-full">
+            <div>
+              <Button variant="ghost" onClick={onClose}>
+                Fermer
+              </Button>
+            </div>
+            <div className="space-x-2">
+              {isEditing ? (
+                <>
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    Annuler
+                  </Button>
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setIsEditing(true)}>
+                  Modifier la demande
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const ApplicationsPage = () => {
+  const navigate = useNavigate();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [dateFilter, setDateFilter] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [cancellingRequest, setCancellingRequest] = useState(null);
+  const itemsPerPage = 10;
+
+  // Fetch requests from API
+  useEffect(() => {
+    fetchRequests();
+  }, [currentPage, statusFilter, searchTerm]);
+
+
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/travel/api/visa-applications/');
+      
+      // Transform the data to match the expected format
+      const formattedRequests = response.data.map(app => ({
+        id: app.id,
+        clientName: app.applicant?.profile?.user ? 
+          `${app.applicant.profile.user.first_name} ${app.applicant.profile.user.last_name}`.trim() : 
+          'Client inconnu',
+        type: app.visa_type?.name || 'N/A',
+        status: app.status || 'draft',
+        createdAt: app.created_at,
+        documents: app.documents || [],
+        // Include all original data for the detail view
+        ...app
+      }));
+      
+      // Apply client-side filtering
+      let filtered = [...formattedRequests];
+      
+      if (statusFilter && statusFilter !== 'all') {
+        filtered = filtered.filter(req => req.status === statusFilter);
+      }
+      
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        filtered = filtered.filter(req => 
+          (req.clientName?.toLowerCase().includes(search)) ||
+          (req.id?.toString().includes(search)) ||
+          (req.visa_type?.name?.toLowerCase().includes(search))
+        );
+      }
+      
+      // Apply pagination
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+      
+      setRequests(paginated);
+      setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      // Show error message to user
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRequests = requests; // Server-side filtering now
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400">En attente</Badge>;
+      case 'received':
+        return <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">Reçue</Badge>;
+      case 'in_review':
+        return <Badge variant="outline" className="border-purple-500 text-purple-600 dark:text-purple-400">En cours</Badge>;
+      case 'approved':
+        return <Badge variant="outline" className="border-green-500 text-green-600 dark:text-green-400">Approuvée</Badge>;
+      case 'rejected':
+        return <Badge variant="outline" className="border-red-500 text-red-600 dark:text-red-400">Rejetée</Badge>;
+      case 'cancelled':
+        return <Badge variant="outline" className="border-gray-500 text-gray-600 dark:text-gray-400">Annulée</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const handleStatusChange = async (updatedRequest) => {
+    try {
+      const response = await axios.patch(`/travel/api/visa-applications/${updatedRequest.id}/`, {
+        status: updatedRequest.status,
+        notes: updatedRequest.notes,
+        assigned_agent: updatedRequest.assigned_agent?.id || null
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        }
+      });
+      
+      // Update the request in the list with the full response data
+      setRequests(prev => 
+        prev.map(req => 
+          req.id === updatedRequest.id ? { ...req, ...response.data } : req
+        )
+      );
+      
+      // Also update the selected request if it's the one being edited
+      if (selectedRequest?.id === updatedRequest.id) {
+        setSelectedRequest(prev => ({
+          ...prev,
+          ...response.data,
+          // Keep the formatted client name
+          clientName: prev.clientName
+        }));
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error updating application status:', error);
+      throw error;
+    }
+  };
+
+  const handleCancelRequest = async (requestId, reason) => {
+    try {
+      const response = await axios.patch(
+        `/travel/api/visa-applications/${requestId}/cancel/`, 
+        { cancellation_reason: reason },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          }
+        }
+      );
+      
+      // Update local state with the cancelled application
+      setRequests(prev => 
+        prev.map(req => 
+          req.id === requestId 
+            ? { 
+                ...req, 
+                status: 'cancelled', 
+                cancellation_reason: reason,
+                updated_at: new Date().toISOString()
+              } 
+            : req
+        )
+      );
+      
+      // Update the selected request if it's open
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest(prev => ({
+          ...prev,
+          status: 'cancelled',
+          cancellation_reason: reason,
+          updated_at: new Date().toISOString()
+        }));
+      }
+      
+      setShowCancelDialog(false);
+      setCancellationReason('');
+      setCancellingRequest(null);
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling application:', error);
+      throw error;
+    }
+  };
+
+  const handleDownloadDocuments = async (request) => {
+    try {
+      const response = await axios.get(
+        `/travel/api/visa-applications/${request.id}/download-documents/`,
+        { responseType: 'blob' }
+      );
+      
+      // Create a blob URL for the downloaded file
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `documents-${request.id}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Error downloading documents:', error);
+      // Show error message to user
+    }
+  };
+
+  const handleViewDetails = (request) => {
+    setSelectedRequest(request);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Gestion des demandes</h2>
+          <p className="text-muted-foreground">
+            Consultez et gérez les demandes de vos clients
+          </p>
+        </div>
+        <Button onClick={() => navigate('/agent/requests/new')}>
+          Nouvelle demande
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader className="border-b">
+          <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Rechercher par nom ou ID..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Tous les statuts" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statuses.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-start text-left font-normal">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {dateFilter ? format(dateFilter, 'PPP', { locale: fr }) : 'Toutes les dates'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateFilter}
+                    onSelect={setDateFilter}
+                    initialFocus
+                    locale={fr}
+                  />
+                  {dateFilter && (
+                    <div className="p-2 border-t">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => setDateFilter(null)}
+                      >
+                        Effacer la date
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Date de création</TableHead>
+                  <TableHead>Documents</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRequests.length > 0 ? (
+                  filteredRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="font-medium">{request.id}</TableCell>
+                      <TableCell>{request.clientName}</TableCell>
+                      <TableCell>{request.type}</TableCell>
+                      <TableCell>{getStatusBadge(request.status)}</TableCell>
+                      <TableCell>
+                        {request.createdAt ? format(new Date(request.createdAt), 'PPP', { locale: fr }) : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-1">
+                          {request.documents && request.documents.length > 0 ? (
+                            <Badge variant="outline" className="flex items-center">
+                              <FileText className="h-3 w-3 mr-1" />
+                              {request.documents.length}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-gray-500">Aucun</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setSelectedRequest(request)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Voir les détails</span>
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDownloadDocuments(request)}
+                            disabled={!request.documents || request.documents.length === 0}
+                          >
+                            <Download className="h-4 w-4" />
+                            <span className="sr-only">Télécharger les documents</span>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      Aucune demande trouvée
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {selectedRequest && (
+        <RequestDetailModal 
+          request={selectedRequest} 
+          onClose={() => setSelectedRequest(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
+
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Annuler la demande</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir annuler cette demande ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label htmlFor="cancellationReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Raison de l'annulation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="cancellationReason"
+                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                rows={3}
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="Veuillez indiquer la raison de l'annulation..."
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+              Annuler
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleCancelRequest}
+              disabled={!cancellationReason.trim()}
+            >
+              Confirmer l'annulation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default ApplicationsPage;

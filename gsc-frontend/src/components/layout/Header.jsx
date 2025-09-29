@@ -63,11 +63,10 @@ const Header = () => {
           </Button>
 
           {user ? (
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <User className="h-4 w-4" />
-                  <span>Mon espace</span>
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard/profile">
+                <Button variant="ghost" size="icon" className="rounded-full" title="Mon profil">
+                  <User className="h-5 w-5" />
                 </Button>
               </Link>
               <Button variant="ghost" size="sm" className="gap-2" onClick={logout}>
@@ -149,10 +148,10 @@ const Header = () => {
 
               {user ? (
                 <>
-                  <Link to="/dashboard" onClick={closeMenu}>
+                  <Link to="/dashboard/profile" onClick={closeMenu}>
                     <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
                       <User className="h-4 w-4" />
-                      <span>Mon espace</span>
+                      <span>Mon profil</span>
                     </Button>
                   </Link>
                   <Button

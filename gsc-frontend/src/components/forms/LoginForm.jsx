@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 import { Button } from '../ui/Button';
@@ -57,99 +57,42 @@ const LoginForm = () => {
     }
   };
 
-  // Toggle password visibility
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {serverError && (
-        <Alert variant="destructive" title="Erreur" description={serverError} />
-      )}
-
-      <div className="space-y-2">
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Adresse email
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Mail className="h-5 w-5 text-gray-400" />
+    <form className="space-y-8 bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-8 border border-blue-100 dark:border-gray-800 animate-fade-in" onSubmit={handleSubmit(onSubmit)}>
+      <div className="flex items-center gap-3 mb-6">
+        <span className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3">
+          <LogIn className="h-7 w-7 text-primary" />
+        </span>
+        <h2 className="text-2xl font-bold text-primary">Connexion à votre espace</h2>
+      </div>
+      {serverError && <Alert variant="error">{serverError}</Alert>}
+      <div className="grid grid-cols-1 gap-6">
+        <div>
+          <label className="block mb-1 font-semibold text-gray-700 dark:text-gray-200">Email</label>
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-primary" />
+            <Input type="email" {...register('email')} placeholder="Votre email" className="w-full rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-800" />
           </div>
-          <Input
-            id="email"
-            type="email"
-            placeholder="nom@exemple.com"
-            className="pl-10"
-            error={errors.email?.message}
-            {...register('email')}
-          />
+          {errors.email && <span className="text-xs text-red-500">{errors.email.message}</span>}
         </div>
-        {errors.email && (
-          <p className="mt-1 text-sm text-rose-500">{errors.email.message}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Mot de passe
-          </label>
-          <Link
-            to={PUBLIC_ROUTES.FORGOT_PASSWORD}
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Mot de passe oublié ?
-          </Link>
-        </div>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
+        <div>
+          <label className="block mb-1 font-semibold text-gray-700 dark:text-gray-200">Mot de passe</label>
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" />
+            <Input type={showPassword ? 'text' : 'password'} {...register('password')} placeholder="Votre mot de passe" className="w-full rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-800" />
+            <button type="button" onClick={() => setShowPassword(v => !v)} className="ml-2 text-primary">
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            className="pl-10"
-            error={errors.password?.message}
-            {...register('password')}
-          />
-          <button
-            type="button"
-            onClick={togglePasswordVisibility}
-            className="absolute inset-y-0 right-0 flex items-center pr-3"
-          >
-            {showPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400" />
-            ) : (
-              <Eye className="h-5 w-5 text-gray-400" />
-            )}
-          </button>
+          {errors.password && <span className="text-xs text-red-500">{errors.password.message}</span>}
         </div>
-        {errors.password && (
-          <p className="mt-1 text-sm text-rose-500">{errors.password.message}</p>
-        )}
       </div>
-
-      <div className="flex items-center">
-        <input
-          id="remember"
-          name="remember"
-          type="checkbox"
-          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-        />
-        <label htmlFor="remember" className="ml-2 block text-sm text-gray-600 dark:text-gray-400">
-          Se souvenir de moi
-        </label>
+      <div className="flex justify-end mt-8">
+        <Button type="submit" className="w-full md:w-auto flex items-center gap-2 animate-bounce-on-hover" disabled={isSubmitting}>
+          Se connecter
+          <LogIn className="h-4 w-4" />
+        </Button>
       </div>
-
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? 'Connexion en cours...' : 'Se connecter'}
-      </Button>
     </form>
   );
 };

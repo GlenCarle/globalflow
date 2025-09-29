@@ -12,8 +12,14 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 # SimpleJWT
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from django.core.paginator import Paginator
 from .models import Client, Profile, Document, TravelType
-from .serializers import ClientSerializer, RegisterSerializer,TravelTypeSerializer,DocumentSerializer
+from travel.models import VisaApplication as Request
+from travel.serializers import VisaApplicationSerializer as RequestSerializer
+from .serializers import (
+    ClientSerializer, ProfileSerializer, RegisterSerializer,
+    TravelTypeSerializer, DocumentSerializer
+)
 from .permissions import IsAdmin, IsAgent
 
 
@@ -104,6 +110,87 @@ class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
+class AgentClientListView(APIView):
+    permission_classes = [IsAuthenticated, IsAgent]
+    
+    def get(self, request):
+        # Get query parameters
+        page = int(request.query_params.get('page', 1))
+        limit = int(request.query_params.get('limit', 10))
+        status_filter = request.query_params.get('status', '')
+        search = request.query_params.get('search', '')
+        
+        # Base queryset
+        queryset = Client.objects.all()
+        
+        # Apply filters
+        if status_filter and status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+            
+        if search:
+            queryset = queryset.filter(
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(phone_number__icontains=search)
+            )
+        
+        # Pagination
+        paginator = Paginator(queryset, limit)
+        page_obj = paginator.get_page(page)
+        
+        serializer = ClientSerializer(page_obj, many=True)
+        
+        return Response({
+            'items': serializer.data,
+            'total': paginator.count,
+            'page': page,
+            'total_pages': paginator.num_pages,
+        })
+
+
+class AgentRequestListView(APIView):
+    permission_classes = [IsAuthenticated, IsAgent]
+    
+    def get(self, request):
+        # Get query parameters
+        page = int(request.query_params.get('page', 1))
+        limit = int(request.query_params.get('limit', 10))
+        status_filter = request.query_params.get('status', '')
+        search = request.query_params.get('search', '')
+        
+        # Base queryset with correct relationship path
+        queryset = Request.objects.select_related('applicant__profile__user')
+        
+        # Apply filters
+        if status_filter and status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+            
+        if search:
+            queryset = queryset.filter(
+                Q(applicant__profile__user__first_name__icontains=search) |
+                Q(applicant__profile__user__last_name__icontains=search) |
+                Q(applicant__profile__user__email__icontains=search) |
+                Q(visa_type__name__icontains=search)
+            )
+        
+        # Order by most recent first
+        queryset = queryset.order_by('-created_at')
+        
+        # Pagination
+        paginator = Paginator(queryset, limit)
+        page_obj = paginator.get_page(page)
+        
+        serializer = RequestSerializer(page_obj, many=True)
+        
+        return Response({
+            'items': serializer.data,
+            'total': paginator.count,
+            'page': page,
+            'total_pages': paginator.num_pages,
+        })
+
+
 # --- User Info ---
 class UserProfileView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -117,17 +204,99 @@ class UserProfileView(APIView):
                     {'error': 'Utilisateur non authentifié'},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
-                
-            return Response({
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_staff': user.is_staff,
-                'is_active': user.is_active,
-                'date_joined': user.date_joined,
-            })
             
+            # Récupérer le profil de l'utilisateur
+            profile = Profile.objects.get(user=user)
+            serializer = ProfileSerializer(profile)
+            
+            print("Données du profil:", serializer.data)
+
+            return Response(serializer.data)
+            
+        except Profile.DoesNotExist:
+            return Response(
+                {'error': 'Profil utilisateur non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def put(self, request):
+        try:
+            user = request.user
+            if not user or not user.is_authenticated:
+                return Response(
+                    {'error': 'Utilisateur non authentifié'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Récupérer le profil de l'utilisateur
+            profile = Profile.objects.get(user=user)
+            
+            # Utiliser le sérialiseur pour valider et mettre à jour les données
+            serializer = ProfileSerializer(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Profile.DoesNotExist:
+            return Response(
+                {'error': 'Profil utilisateur non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+# --- Upload Profile Picture ---
+class ProfilePictureUploadView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            user = request.user
+            if not user or not user.is_authenticated:
+                return Response(
+                    {'error': 'Utilisateur non authentifié'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Récupérer le profil de l'utilisateur
+            profile = Profile.objects.get(user=user)
+            
+            # Vérifier si une image a été fournie
+            if 'profile_picture' not in request.FILES:
+                return Response(
+                    {'error': 'Aucune image fournie'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Supprimer l'ancienne image si elle existe
+            if profile.profile_picture:
+                profile.profile_picture.delete()
+            
+            # Enregistrer la nouvelle image
+            profile.profile_picture = request.FILES['profile_picture']
+            profile.save()
+            
+            # Retourner les données du profil mises à jour
+            serializer = ProfileSerializer(profile)
+            return Response(serializer.data)
+            
+        except Profile.DoesNotExist:
+            return Response(
+                {'error': 'Profil utilisateur non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             return Response(
                 {'error': str(e)},

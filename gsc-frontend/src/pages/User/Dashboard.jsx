@@ -1,34 +1,52 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  FileText, 
-  PlaneTakeoff, 
-  Calendar, 
-  FileCheck, 
-  MessageSquare, 
+import {
+  FileText,
+  PlaneTakeoff,
+  Calendar,
+  FileCheck,
+  MessageSquare,
   CreditCard,
   ArrowRight,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Plus
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useAuth } from '../../contexts/AuthContext';
 import {PUBLIC_ROUTES, CLIENT_ROUTES} from '../../constants/routes';
+import axios from '../../lib/axios';
 
 const UserDashboard = () => {
   const { user } = useAuth();
+  const [applications, setApplications] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data for dashboard
-  const applications = [
-    { id: 1, type: 'Visa Étudiant', destination: 'Canada', status: 'En cours', date: '2025-10-15' },
-    { id: 2, type: 'Visa Tourisme', destination: 'France', status: 'Approuvé', date: '2025-09-30' },
-  ];
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const appointments = [
-    { id: 1, title: 'Consultation visa', date: '2025-09-25', time: '10:00', status: 'Confirmé' },
-  ];
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [applicationsResponse, appointmentsResponse] = await Promise.all([
+        axios.get('/travel/api/visa-applications/'),
+        axios.get('/travel/api/appointments/')
+      ]);
+      setApplications(applicationsResponse.data);
+      setAppointments(appointmentsResponse.data);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError('Erreur lors du chargement des données');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const documents = [
     { id: 1, name: 'Passeport', status: 'Valide', expiration: '2028-05-12' },
@@ -49,11 +67,16 @@ const UserDashboard = () => {
       case 'validé':
       case 'valide':
       case 'confirmé':
+      case 'read':
         return 'success';
       case 'refusé':
+      case 'canceled':
         return 'destructive';
       case 'en attente de validation':
+      case 'unread':
         return 'warning';
+      case 'postponed':
+        return 'secondary';
       default:
         return 'default';
     }
@@ -79,10 +102,10 @@ const UserDashboard = () => {
                 <FileText className="h-4 w-4" />
               </Button>
             </Link>
-            <Link to={PUBLIC_ROUTES.IMMIGRATION_ASSISTANT}>
+            <Link to={CLIENT_ROUTES.VISA_APPLICATIONS_NEW}>
               <Button className="gap-2">
-                Nouvelle demande
-                <ArrowRight className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
+                Nouvelle demande de visa
               </Button>
             </Link>
           </div>
@@ -100,7 +123,9 @@ const UserDashboard = () => {
           <CardContent>
             <div className="flex items-center">
               <FileText className="mr-2 h-5 w-5 text-primary" />
-              <span className="text-2xl font-bold">{applications.filter(a => a.status === 'En cours').length}</span>
+              <span className="text-2xl font-bold">
+                {applications.filter(a => ['draft', 'submitted', 'under_review', 'additional_info_required'].includes(a.status)).length}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -108,13 +133,13 @@ const UserDashboard = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Prochains rendez-vous
+              Rendez-vous non lus
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <Calendar className="mr-2 h-5 w-5 text-primary" />
-              <span className="text-2xl font-bold">{appointments.length}</span>
+              <span className="text-2xl font-bold">{appointments.filter(a => a.status === 'unread').length}</span>
             </div>
           </CardContent>
         </Card>
@@ -165,28 +190,35 @@ const UserDashboard = () => {
             </Link>
           </CardHeader>
           <CardContent>
-            {applications.length > 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : applications.length > 0 ? (
               <div className="space-y-4">
-                {applications.map((application) => (
+                {applications.slice(0, 3).map((application) => (
                   <div key={application.id} className="flex items-start justify-between rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{application.type}</h3>
+                        <h3 className="font-medium">{application.visa_type_name}</h3>
                         <Badge variant={getStatusVariant(application.status)}>
-                          {application.status}
+                          {application.get_status_display}
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Destination: {application.destination}
+                        Destination: {application.country_name}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
                         <Clock className="mr-1 h-4 w-4" />
-                        Date prévue: {new Date(application.date).toLocaleDateString('fr-FR')}
+                        Créé le: {new Date(application.created_at).toLocaleDateString('fr-FR')}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Documents: {application.documents_completed}/{application.total_documents} validés
                       </p>
                     </div>
-                    <Link to={`${CLIENT_ROUTES.APPLICATIONS}/${application.id}`}>
+                    <Link to={`/dashboard/visa-applications/${application.id}`}>
                       <Button variant="ghost" size="sm">
-                        Détails
+                        Modifier
                       </Button>
                     </Link>
                   </div>
@@ -199,8 +231,8 @@ const UserDashboard = () => {
                 <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
                   Vous n'avez pas encore de demande en cours
                 </p>
-                <Link to={PUBLIC_ROUTES.IMMIGRATION_ASSISTANT}>
-                  <Button>Créer une demande</Button>
+                <Link to={CLIENT_ROUTES.VISA_APPLICATIONS_NEW}>
+                  <Button>Créer une demande de visa</Button>
                 </Link>
               </div>
             )}
@@ -224,23 +256,60 @@ const UserDashboard = () => {
           <CardContent>
             {appointments.length > 0 ? (
               <div className="space-y-4">
-                {appointments.map((appointment) => (
+                {appointments.slice(0, 3).map((appointment) => (
                   <div key={appointment.id} className="flex items-start justify-between rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                    <div className="space-y-1">
+                    <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{appointment.title}</h3>
+                        <h3 className="font-medium">{appointment.reason_display}</h3>
                         <Badge variant={getStatusVariant(appointment.status)}>
-                          {appointment.status}
+                          {appointment.status_display}
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
                         <Calendar className="mr-1 h-4 w-4" />
-                        {new Date(appointment.date).toLocaleDateString('fr-FR')} à {appointment.time}
+                        {appointment.date_formatted}
                       </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Lieu: {appointment.location_display}
+                      </p>
+                      {appointment.message && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-sm">
+                          <p className="text-blue-800 dark:text-blue-200">
+                            {appointment.message}
+                          </p>
+                        </div>
+                      )}
+                      {appointment.required_documents && appointment.required_documents.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Documents requis:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {appointment.required_documents.map((doc, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {doc}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <Button variant="outline" size="sm">
-                      Modifier
-                    </Button>
+                    <div className="flex gap-2 ml-4">
+                      {appointment.status === 'unread' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await axios.post(`/travel/api/appointments/${appointment.id}/mark_as_read/`);
+                              loadData(); // Reload data
+                            } catch (error) {
+                              console.error('Error marking as read:', error);
+                            }
+                          }}
+                        >
+                          Marquer lu
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -251,7 +320,7 @@ const UserDashboard = () => {
                 <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
                   Vous n'avez pas de rendez-vous à venir
                 </p>
-                <Button>Prendre rendez-vous</Button>
+                <Button variant="outline">Contacter un agent</Button>
               </div>
             )}
           </CardContent>

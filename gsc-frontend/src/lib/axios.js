@@ -3,7 +3,7 @@ import authService from './auth.service';
 
 // Create axios instance with custom config
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -13,13 +13,18 @@ const api = axios.create({
 // Add a request interceptor to add the auth token to each request
 api.interceptors.request.use(
   (config) => {
+    // Skip adding authorization header for token refresh requests
+    if (config.url && config.url.includes('/token/refresh/')) {
+      return config;
+    }
+
     // Utiliser le service d'authentification pour obtenir les tokens
     const tokens = authService.getTokens();
-    
+
     if (tokens && tokens.access) {
       config.headers.Authorization = `Bearer ${tokens.access}`;
     }
-    
+
     return config;
   },
   (error) => {
@@ -34,9 +39,11 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // If error is 401 Unauthorized and we haven't tried to refresh the token yet
+    // Skip refresh logic for token refresh requests to avoid infinite loops
     if (
       error.response?.status === 401 &&
-      !originalRequest._retry
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/token/refresh/')
     ) {
       originalRequest._retry = true;
 
@@ -52,7 +59,7 @@ api.interceptors.response.use(
           // If refresh failed, clear auth data
           authService.clearTokens();
           authService.clearUser();
-          
+
           // Redirect to login page if we're in a browser environment
           if (typeof window !== 'undefined') {
             window.location.href = '/login';
@@ -63,7 +70,7 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );

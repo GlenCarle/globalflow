@@ -1,0 +1,171 @@
+import React, { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PUBLIC_ROUTES, CLIENT_ROUTES, AGENT_ROUTES, ADMIN_ROUTES, ERROR_ROUTES } from './constants/routes';
+
+// Layouts
+const MainLayout = lazy(() => import('./components/layout/MainLayout'));
+const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
+const AgentLayout = lazy(() => import('./components/layout/AgentLayout'));
+const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
+
+// Auth Components
+const ProtectedRoute = lazy(() => import('./components/auth/ProtectedRoute'));
+const RoleGuard = lazy(() => import('./components/auth/RoleGuard'));
+
+// Public Pages
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const ImmigrationAssistantPage = lazy(() => import('./pages/ImmigrationAssistantPage'));
+
+// Client Pages
+const UserDashboardPage = lazy(() => import('./pages/UserDashboardPage'));
+const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
+const MyApplicationsPage = lazy(() => import('./pages/MyApplicationsPage'));
+const ApplicationDetailPage = lazy(() => import('./pages/ApplicationDetailPage'));
+const VisaApplicationPage = lazy(() => import('./pages/VisaApplicationPage'));
+const MyBookingsPage = lazy(() => import('./pages/MyBookingsPage'));
+const MyAppointmentsPage = lazy(() => import('./pages/MyAppointmentsPage'));
+const DocumentsHubPage = lazy(() => import('./pages/DocumentsHubPage'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+
+// Agent Pages
+const AgentDashboardPage = lazy(() => import('./pages/agent/AgentDashboard'));
+const ApplicationsManagementPage = lazy(() => import('./pages/agent/ApplicationsManagement'));
+const CaseDetailPage = lazy(() => import('./pages/agent/CaseDetail'));
+const AgentAppointmentsPage = lazy(() => import('./pages/agent/AgentAppointments'));
+const AgentClientsPage = lazy(() => import('./pages/agent/AgentClients'));
+const AgentClientDetailPage = lazy(() => import('./pages/agent/AgentClientDetail'));
+const AgentMessagesPage = lazy(() => import('./pages/agent/AgentMessages'));
+const AgentAlertsPage = lazy(() => import('./pages/agent/AgentAlerts'));
+
+// Admin Pages
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboard'));
+const UserManagementPage = lazy(() => import('./pages/admin/UserManagement'));
+const UserDetailPage = lazy(() => import('./pages/admin/UserDetail'));
+const AgentManagementPage = lazy(() => import('./pages/admin/AgentManagement'));
+const AgentDetailPage = lazy(() => import('./pages/admin/AgentDetail'));
+const ServiceCatalogPage = lazy(() => import('./pages/admin/ServiceCatalog'));
+const AdminServiceDetailPage = lazy(() => import('./pages/admin/ServiceDetail'));
+const ReportsPage = lazy(() => import('./pages/admin/Reports'));
+const SettingsPage = lazy(() => import('./pages/admin/Settings'));
+
+// Error Pages
+const UnauthorizedPage = lazy(() => import('./pages/errors/Unauthorized'));
+const NotFoundPage = lazy(() => import('./pages/errors/NotFound'));
+
+// Loading component for Suspense fallback
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+  </div>
+);
+
+function App() {
+  const { initialized } = useAuth();
+
+  // Show loading state while auth is initializing
+  if (!initialized) {
+    return <LoadingFallback />;
+  }
+
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Routes */}
+          <Route element={<MainLayout />}>
+            <Route index element={<LandingPage />} />
+            <Route path={PUBLIC_ROUTES.LOGIN} element={<LoginPage />} />
+            <Route path={PUBLIC_ROUTES.REGISTER} element={<RegisterPage />} />
+            <Route path={PUBLIC_ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+            <Route path={`${PUBLIC_ROUTES.RESET_PASSWORD}/:uidb64/:token`} element={<ResetPasswordPage />} />
+            <Route path={PUBLIC_ROUTES.SERVICES} element={<ServicesPage />} />
+            <Route path={PUBLIC_ROUTES.SERVICE_DETAIL} element={<ServiceDetailPage />} />
+            <Route path={PUBLIC_ROUTES.ABOUT} element={<AboutPage />} />
+            <Route path={PUBLIC_ROUTES.CONTACT} element={<ContactPage />} />
+            <Route path={PUBLIC_ROUTES.IMMIGRATION_ASSISTANT} element={<ImmigrationAssistantPage />} />
+          </Route>
+
+          {/* Client Routes - Only accessible by clients */}
+          <Route element={
+            <ProtectedRoute allowedRoles={['client']}>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }>
+            <Route path={CLIENT_ROUTES.DASHBOARD} element={<UserDashboardPage />} />
+            <Route path={CLIENT_ROUTES.PROFILE} element={<UserProfilePage />} />
+            <Route path={CLIENT_ROUTES.APPLICATIONS} element={<MyApplicationsPage />} />
+            <Route path={CLIENT_ROUTES.APPLICATION_DETAIL} element={<ApplicationDetailPage />} />
+            <Route path={CLIENT_ROUTES.VISA_APPLICATIONS_NEW} element={<VisaApplicationPage />} />
+            <Route path={CLIENT_ROUTES.VISA_APPLICATION_DETAIL} element={<VisaApplicationPage />} />
+            <Route path={CLIENT_ROUTES.BOOKINGS} element={<MyBookingsPage />} />
+            <Route path={CLIENT_ROUTES.APPOINTMENTS} element={<MyAppointmentsPage />} />
+            <Route path={CLIENT_ROUTES.DOCUMENTS} element={<DocumentsHubPage />} />
+            <Route path={CLIENT_ROUTES.MESSAGES} element={<MessagesPage />} />
+            <Route path={CLIENT_ROUTES.PAYMENTS} element={<PaymentsPage />} />
+            <Route path={CLIENT_ROUTES.CHECKOUT} element={<CheckoutPage />} />
+          </Route>
+
+          {/* Agent Routes - Only accessible by agents */}
+          <Route element={
+            <ProtectedRoute allowedRoles={['agent']}>
+              <AgentLayout />
+            </ProtectedRoute>
+          }>
+            <Route path={AGENT_ROUTES.DASHBOARD} element={<AgentDashboardPage />} />
+            <Route path={AGENT_ROUTES.APPLICATIONS} element={<ApplicationsManagementPage />} />
+            <Route path={AGENT_ROUTES.CASE_DETAIL} element={<CaseDetailPage />} />
+            <Route path={AGENT_ROUTES.APPOINTMENTS} element={<AgentAppointmentsPage />} />
+            <Route path={AGENT_ROUTES.CLIENTS} element={<AgentClientsPage />} />
+            <Route path={AGENT_ROUTES.CLIENT_DETAIL} element={<AgentClientDetailPage />} />
+            <Route path={AGENT_ROUTES.MESSAGES} element={<AgentMessagesPage />} />
+            <Route path={AGENT_ROUTES.ALERTS} element={<AgentAlertsPage />} />
+          </Route>
+
+          {/* Admin Routes - Only accessible by admins */}
+          <Route element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }>
+            <Route path={ADMIN_ROUTES.DASHBOARD} element={<AdminDashboardPage />} />
+            <Route path={ADMIN_ROUTES.USERS} element={<UserManagementPage />} />
+            <Route path={ADMIN_ROUTES.USER_DETAIL} element={<UserDetailPage />} />
+            <Route path={ADMIN_ROUTES.AGENTS} element={<AgentManagementPage />} />
+            <Route path={ADMIN_ROUTES.AGENT_DETAIL} element={<AgentDetailPage />} />
+            <Route path={ADMIN_ROUTES.SERVICES} element={<ServiceCatalogPage />} />
+            <Route path={ADMIN_ROUTES.SERVICE_DETAIL} element={<AdminServiceDetailPage />} />
+            <Route path={ADMIN_ROUTES.REPORTS} element={<ReportsPage />} />
+            <Route path={ADMIN_ROUTES.SETTINGS} element={<SettingsPage />} />
+          </Route>
+
+          {/* Error Pages */}
+          <Route path={ERROR_ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </Suspense>
+  );
+}
+
+// Wrap the App with necessary providers
+const AppWithProviders = () => (
+  <ThemeProvider>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </ThemeProvider>
+);
+
+export default AppWithProviders;

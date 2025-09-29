@@ -33,6 +33,21 @@ export const registerSchema = z.object({
     .string()
     .min(1, { message: 'Le numéro de téléphone est requis' })
     .max(20, { message: 'Le numéro de téléphone ne doit pas dépasser 20 caractères' }),
+  address: z
+    .string()
+    .optional()
+    .default(''),
+  city: z
+    .string()
+    .optional()
+    .default(''),
+  country: z
+    .string()
+    .optional()
+    .default(''),
+  role: z
+    .string()
+    .default('client'),
   password: z
     .string()
     .min(8, { message: 'Le mot de passe doit contenir au moins 8 caractères' })

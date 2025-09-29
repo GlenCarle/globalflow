@@ -5,9 +5,12 @@ import { cn } from '../../lib/utils';
 const SelectContext = createContext({});
 
 const Select = React.forwardRef(
-  ({ children, value, onChange, disabled = false, placeholder, error, ...props }, ref) => {
+  ({ children, value, onChange, onValueChange, disabled = false, placeholder, error, ...props }, ref) => {
     const [open, setOpen] = useState(false);
     const id = useId();
+
+    // Use onValueChange if provided, otherwise onChange
+    const handleChange = onValueChange || onChange;
 
     return (
       <SelectContext.Provider
@@ -15,7 +18,7 @@ const Select = React.forwardRef(
           open,
           setOpen,
           value,
-          onChange,
+          onChange: handleChange,
           disabled,
           id,
         }}
@@ -104,4 +107,15 @@ const SelectItem = React.forwardRef(({ className, children, value, ...props }, r
 });
 SelectItem.displayName = "SelectItem";
 
-export { Select, SelectTrigger, SelectContent, SelectItem };
+const SelectValue = ({ children, placeholder, ...props }) => {
+  const { value } = useContext(SelectContext);
+  
+  return (
+    <span className="truncate" {...props}>
+      {value ? children : placeholder}
+    </span>
+  );
+};
+SelectValue.displayName = "SelectValue";
+
+export { Select, SelectTrigger, SelectContent, SelectItem, SelectValue };

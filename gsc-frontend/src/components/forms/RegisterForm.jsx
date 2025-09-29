@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin, UserCog, UserPlus } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Alert } from '../ui/Alert';
+import { Select, SelectTrigger, SelectContent, SelectItem } from '../ui/Select';
 import { registerSchema } from '../../lib/validations/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { CLIENT_ROUTES } from '../../constants/routes';
@@ -25,6 +26,8 @@ const RegisterForm = () => {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(registerSchema),
@@ -33,6 +36,10 @@ const RegisterForm = () => {
       lastName: '',
       email: '',
       phone: '',
+      address: '',
+      city: '',
+      country: '',
+      role: 'client',
       password: '',
       confirmPassword: '',
       terms: false,
@@ -42,29 +49,30 @@ const RegisterForm = () => {
   // Form submission handler
   const onSubmit = async (data) => {
     setServerError('');
-
     try {
       const userData = {
-        username: data.email, // Utiliser l'email comme nom d'utilisateur
+        username: data.email,
         email: data.email,
         password: data.password,
         first_name: data.firstName,
         last_name: data.lastName,
+        phone: data.phone,
+        address: data.address,
+        city: data.city,
+        country: data.country,
+        role: data.role,
       };
-
       const result = await registerUser(userData);
-
       if (result.success) {
-        // Rediriger vers le tableau de bord après inscription réussie
         navigate(CLIENT_ROUTES.DASHBOARD);
       } else {
-        setServerError(result.error || 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.');
+        setServerError(result.error || "Une erreur est survenue lors de l'inscription. Veuillez réessayer.");
       }
     } catch (error) {
       console.error('Registration error:', error);
       setServerError(error.response?.data?.username?.[0] || 
                     error.response?.data?.email?.[0] || 
-                    'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.');
+                    "Une erreur est survenue lors de l'inscription. Veuillez réessayer.");
     }
   };
 
@@ -74,189 +82,281 @@ const RegisterForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {serverError && (
-        <Alert variant="destructive" title="Erreur" description={serverError} />
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Prénom
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <User className="h-5 w-5 text-gray-400" />
-            </div>
-            <Input
-              id="firstName"
-              type="text"
-              placeholder="Jean"
-              className="pl-10"
-              error={errors.firstName?.message}
-              {...register('firstName')}
-            />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/30 via-indigo-200/40 to-rose-100/40 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-2">
+      <div className="w-full max-w-xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-950/90 border border-gray-200 dark:border-gray-800 p-8 relative">
+        {/* Header */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="bg-gradient-to-tr from-primary to-indigo-500 rounded-full p-3 mb-2 shadow-lg">
+            <UserPlus className="h-8 w-8 text-white" />
           </div>
-          {errors.firstName && (
-            <p className="mt-1 text-sm text-rose-500">{errors.firstName.message}</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Créer un compte</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Rejoignez l'agence et accédez à tous nos services premium</p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {serverError && (
+            <Alert variant="destructive" title="Erreur" description={serverError} />
           )}
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Nom
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <User className="h-5 w-5 text-gray-400" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Prénom
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="Jean"
+                  className="pl-10"
+                  error={errors.firstName?.message}
+                  {...register('firstName')}
+                />
+              </div>
+              {errors.firstName && (
+                <p className="mt-1 text-sm text-rose-500">{errors.firstName.message}</p>
+              )}
             </div>
-            <Input
-              id="lastName"
-              type="text"
-              placeholder="Dupont"
-              className="pl-10"
-              error={errors.lastName?.message}
-              {...register('lastName')}
-            />
+            <div className="space-y-2">
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Nom
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Dupont"
+                  className="pl-10"
+                  error={errors.lastName?.message}
+                  {...register('lastName')}
+                />
+              </div>
+              {errors.lastName && (
+                <p className="mt-1 text-sm text-rose-500">{errors.lastName.message}</p>
+              )}
+            </div>
           </div>
-          {errors.lastName && (
-            <p className="mt-1 text-sm text-rose-500">{errors.lastName.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Adresse email
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Mail className="h-5 w-5 text-gray-400" />
-          </div>
-          <Input
-            id="email"
-            type="email"
-            placeholder="nom@exemple.com"
-            className="pl-10"
-            error={errors.email?.message}
-            {...register('email')}
-          />
-        </div>
-        {errors.email && (
-          <p className="mt-1 text-sm text-rose-500">{errors.email.message}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Téléphone
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Phone className="h-5 w-5 text-gray-400" />
-          </div>
-          <Input
-            id="phone"
-            type="tel"
-            placeholder="+237 123 456 789"
-            className="pl-10"
-            error={errors.phone?.message}
-            {...register('phone')}
-          />
-        </div>
-        {errors.phone && (
-          <p className="mt-1 text-sm text-rose-500">{errors.phone.message}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Mot de passe
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
-          </div>
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            className="pl-10"
-            error={errors.password?.message}
-            {...register('password')}
-          />
-          <button
-            type="button"
-            onClick={togglePasswordVisibility}
-            className="absolute inset-y-0 right-0 flex items-center pr-3"
-          >
-            {showPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400" />
-            ) : (
-              <Eye className="h-5 w-5 text-gray-400" />
+          <div className="space-y-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Adresse email
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Mail className="h-5 w-5 text-gray-400" />
+              </div>
+              <Input
+                id="email"
+                type="email"
+                placeholder="nom@exemple.com"
+                className="pl-10"
+                error={errors.email?.message}
+                {...register('email')}
+              />
+            </div>
+            {errors.email && (
+              <p className="mt-1 text-sm text-rose-500">{errors.email.message}</p>
             )}
-          </button>
-        </div>
-        {errors.password && (
-          <p className="mt-1 text-sm text-rose-500">{errors.password.message}</p>
-        )}
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Le mot de passe doit contenir au moins 8 caractères
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Confirmer le mot de passe
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
           </div>
-          <Input
-            id="confirmPassword"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            className="pl-10"
-            error={errors.confirmPassword?.message}
-            {...register('confirmPassword')}
-          />
+          <div className="space-y-2">
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Téléphone
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Phone className="h-5 w-5 text-gray-400" />
+              </div>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+237 123 456 789"
+                className="pl-10"
+                error={errors.phone?.message}
+                {...register('phone')}
+              />
+            </div>
+            {errors.phone && (
+              <p className="mt-1 text-sm text-rose-500">{errors.phone.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Adresse
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <MapPin className="h-5 w-5 text-gray-400" />
+              </div>
+              <Input
+                id="address"
+                type="text"
+                placeholder="123 Rue Exemple"
+                className="pl-10"
+                error={errors.address?.message}
+                {...register('address')}
+              />
+            </div>
+            {errors.address && (
+              <p className="mt-1 text-sm text-rose-500">{errors.address.message}</p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Ville
+              </label>
+              <Input
+                id="city"
+                type="text"
+                placeholder="Douala"
+                error={errors.city?.message}
+                {...register('city')}
+              />
+              {errors.city && (
+                <p className="mt-1 text-sm text-rose-500">{errors.city.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="country" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Pays
+              </label>
+              <Input
+                id="country"
+                type="text"
+                placeholder="Cameroun"
+                error={errors.country?.message}
+                {...register('country')}
+              />
+              {errors.country && (
+                <p className="mt-1 text-sm text-rose-500">{errors.country.message}</p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Rôle
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
+                <UserCog className="h-5 w-5 text-gray-400" />
+              </div>
+              <Select
+                value={watch('role')}
+                onChange={(value) => setValue('role', value)}
+                error={errors.role?.message}
+              >
+                <SelectTrigger className="pl-10">
+                  {watch('role') === 'client' && 'Client'}
+                  {watch('role') === 'agent' && 'Agent'}
+                  {watch('role') === 'admin' && 'Administrateur'}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="client">Client</SelectItem>
+                  <SelectItem value="agent">Agent</SelectItem>
+                  <SelectItem value="admin">Administrateur</SelectItem>
+                </SelectContent>
+              </Select>
+              <input type="hidden" {...register('role')} />
+            </div>
+            {errors.role && (
+              <p className="mt-1 text-sm text-rose-500">{errors.role.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Mot de passe
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-400" />
+              </div>
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                className="pl-10"
+                error={errors.password?.message}
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <Eye className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="mt-1 text-sm text-rose-500">{errors.password.message}</p>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Le mot de passe doit contenir au moins 8 caractères
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Confirmer le mot de passe
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-400" />
+              </div>
+              <Input
+                id="confirmPassword"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                className="pl-10"
+                error={errors.confirmPassword?.message}
+                {...register('confirmPassword')}
+              />
+            </div>
+            {errors.confirmPassword && (
+              <p className="mt-1 text-sm text-rose-500">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+          <div className="flex items-center">
+            <input
+              id="terms"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              {...register('terms')}
+            />
+            <label htmlFor="terms" className="ml-2 block text-sm text-gray-600 dark:text-gray-400">
+              J'accepte les{' '}
+              <Link to="/terms" className="text-primary hover:underline">
+                conditions d'utilisation
+              </Link>{' '}
+              et la{' '}
+              <Link to="/privacy" className="text-primary hover:underline">
+                politique de confidentialité
+              </Link>
+            </label>
+          </div>
+          {errors.terms && (
+            <p className="mt-1 text-sm text-rose-500">{errors.terms.message}</p>
+          )}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Inscription en cours...' : 'Créer un compte'}
+          </Button>
+        </form>
+        {/* Footer link */}
+        <div className="mt-6 text-center">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Déjà inscrit ? </span>
+          <Link to="/login" className="text-primary font-medium hover:underline">Se connecter</Link>
         </div>
-        {errors.confirmPassword && (
-          <p className="mt-1 text-sm text-rose-500">{errors.confirmPassword.message}</p>
-        )}
       </div>
-
-      <div className="flex items-center">
-        <input
-          id="terms"
-          type="checkbox"
-          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-          {...register('terms')}
-        />
-        <label htmlFor="terms" className="ml-2 block text-sm text-gray-600 dark:text-gray-400">
-          J'accepte les{' '}
-          <Link to="/terms" className="text-primary hover:underline">
-            conditions d'utilisation
-          </Link>{' '}
-          et la{' '}
-          <Link to="/privacy" className="text-primary hover:underline">
-            politique de confidentialité
-          </Link>
-        </label>
-      </div>
-      {errors.terms && (
-        <p className="mt-1 text-sm text-rose-500">{errors.terms.message}</p>
-      )}
-
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? 'Inscription en cours...' : 'Créer un compte'}
-      </Button>
-    </form>
+    </div>
   );
 };
 

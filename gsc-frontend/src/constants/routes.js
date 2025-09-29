@@ -3,6 +3,14 @@
  * This file contains all the routes used in the application
  */
 
+// Error pages
+export const ERROR_ROUTES = {
+  NOT_FOUND: '/404',
+  UNAUTHORIZED: '/unauthorized',
+  SERVER_ERROR: '/500',
+  FORBIDDEN: '/403',
+};
+
 // Public routes
 export const PUBLIC_ROUTES = {
   HOME: '/',
@@ -15,33 +23,96 @@ export const PUBLIC_ROUTES = {
   ABOUT: '/about',
   CONTACT: '/contact',
   IMMIGRATION_ASSISTANT: '/immigration-assistant',
+  PRIVACY_POLICY: '/privacy-policy',
+  TERMS_OF_SERVICE: '/terms-of-service',
+  FAQ: '/faq',
+  ...ERROR_ROUTES,
 };
 
 // Client routes
 export const CLIENT_ROUTES = {
   DASHBOARD: '/dashboard',
   PROFILE: '/dashboard/profile',
-  APPLICATIONS: '/dashboard/applications',
-  APPLICATION_DETAIL: '/dashboard/applications/:id',
+  PROFILE_EDIT: '/dashboard/profile/edit',
+  SECURITY: '/dashboard/security',
+  NOTIFICATIONS: '/dashboard/notifications',
+  
+  // Applications
+  APPLICATIONS: '/dashboard/my-applications',
+  APPLICATION_DETAIL: '/dashboard/my-applications/:id',
+  VISA_APPLICATIONS: '/dashboard/visa-applications',
+  VISA_APPLICATIONS_NEW: '/dashboard/visa-applications/new',
+  VISA_APPLICATION_DETAIL: '/dashboard/visa-applications/:id',
+  
+  // Bookings & Appointments
   BOOKINGS: '/dashboard/bookings',
   BOOKING_DETAIL: '/dashboard/bookings/:id',
   APPOINTMENTS: '/dashboard/appointments',
+  APPOINTMENT_DETAIL: '/dashboard/appointments/:id',
+  
+  // Documents & Messages
   DOCUMENTS: '/dashboard/documents',
+  DOCUMENT_UPLOAD: '/dashboard/documents/upload',
   MESSAGES: '/dashboard/messages',
+  MESSAGE_THREAD: '/dashboard/messages/:threadId',
+  
+  // Billing & Payments
   PAYMENTS: '/dashboard/payments',
+  PAYMENT_DETAIL: '/payment/:bookingId',
+  PAYMENT_METHODS: '/dashboard/payments/methods',
+  PAYMENT_HISTORY: '/dashboard/payments/history',
+  INVOICES: '/dashboard/payments/invoices',
+  INVOICE_DETAIL: '/dashboard/payments/invoices/:id',
+
+  // Checkout
   CHECKOUT: '/dashboard/checkout',
+  CHECKOUT_CONFIRMATION: '/dashboard/checkout/confirmation',
+  
+  // Settings
+  SETTINGS: '/dashboard/settings',
+  PREFERENCES: '/dashboard/settings/preferences',
 };
 
 // Agent routes
 export const AGENT_ROUTES = {
   DASHBOARD: '/agent',
-  CASES: '/agent/cases',
+  
+  // Applications & Cases
+  APPLICATIONS: '/agent/applications',
+  APPLICATION_DETAIL: '/agent/applications/:id',
   CASE_DETAIL: '/agent/cases/:id',
+  CASE_REVIEW: '/agent/cases/:id/review',
+  
+  // Appointments
   APPOINTMENTS: '/agent/appointments',
+  APPOINTMENT_DETAIL: '/agent/appointments/:id',
+  APPOINTMENT_CREATE: '/agent/appointments/new',
+  
+  // Clients
   CLIENTS: '/agent/clients',
   CLIENT_DETAIL: '/agent/clients/:id',
+  CLIENT_EDIT: '/agent/clients/:id/edit',
+
+  // Payments & Bookings
+  PAYMENTS_MANAGEMENT: '/agent/payments-management',
+  BOOKINGS_MANAGEMENT: '/agent/bookings-management',
+  
+  // Communication
   MESSAGES: '/agent/messages',
+  MESSAGE_THREAD: '/agent/messages/:threadId',
+  
+  // Alerts & Notifications
   ALERTS: '/agent/alerts',
+  NOTIFICATIONS: '/agent/notifications',
+  
+  // Reports
+  REPORTS: '/agent/reports',
+  PERFORMANCE: '/agent/performance',
+  
+  // Settings
+  SETTINGS: '/agent/settings',
+  PROFILE: '/agent/profile',
+  PREFERENCES: '/agent/preferences',
 };
 
 // Admin routes

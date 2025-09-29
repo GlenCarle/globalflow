@@ -1,41 +1,123 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  FileText, 
-  Users, 
-  Calendar, 
-  MessageSquare, 
+import {
+  FileText,
+  Users,
+  Calendar,
+  MessageSquare,
   Bell,
   ArrowRight,
   Clock,
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Search
+  Search,
+  Eye,
+  Edit
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
-import ROUTES from '../../constants/routes';
+import { AGENT_ROUTES } from '../../constants/routes';
+import axios from '../../lib/axios';
 
 const AgentDashboard = () => {
   const { user } = useAuth();
+  const [applications, setApplications] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [travelBookings, setTravelBookings] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock data for dashboard
-  const cases = [
-    { id: 1, client: 'Jean Dupont', type: 'Visa Étudiant', destination: 'Canada', status: 'En cours', lastUpdate: '2025-09-16' },
-    { id: 2, client: 'Marie Martin', type: 'Visa Tourisme', destination: 'France', status: 'En attente de documents', lastUpdate: '2025-09-15' },
-    { id: 3, client: 'Pierre Dubois', type: 'Visa Travail', destination: 'États-Unis', status: 'Documents validés', lastUpdate: '2025-09-14' },
-    { id: 4, client: 'Sophie Lefebvre', type: 'Résidence Permanente', destination: 'Canada', status: 'Entretien programmé', lastUpdate: '2025-09-13' },
-  ];
+  useEffect(() => {
+    loadApplications();
+  }, []);
 
-  const appointments = [
-    { id: 1, client: 'Jean Dupont', title: 'Consultation visa', date: '2025-09-25', time: '10:00', status: 'Confirmé' },
-    { id: 2, client: 'Sophie Lefebvre', title: 'Entretien préliminaire', date: '2025-09-26', time: '14:30', status: 'Confirmé' },
-    { id: 3, client: 'Pierre Dubois', title: 'Vérification documents', date: '2025-09-27', time: '11:15', status: 'En attente' },
-  ];
+  const loadApplications = async () => {
+    try {
+      setLoading(true);
+      const [applicationsResponse, paymentsResponse, bookingsResponse, appointmentsResponse] = await Promise.all([
+        axios.get('/travel/api/visa-applications/'),
+        axios.get('/travel/api/payments/'),
+        axios.get('/travel/api/travel-bookings/'),
+        axios.get('/travel/api/appointments/')
+      ]);
+      setApplications(applicationsResponse.data);
+      setPayments(paymentsResponse.data);
+      setTravelBookings(bookingsResponse.data);
+      setAppointments(appointmentsResponse.data);
+
+      // Debug: log payments data
+      console.log('Payments data:', paymentsResponse.data);
+      console.log('Pending payments:', paymentsResponse.data.filter(p => p.status === 'processing'));
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError('Erreur lors du chargement des données');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredApplications = applications.filter(app =>
+    app.applicant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.visa_type_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.country_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const pendingPayments = payments.filter(p => p.status === 'pending');
+  const completedPayments = payments.filter(p => p.status === 'completed');
+
+  // Get bookings that need appointments (confirmed bookings without appointments)
+  const getBookingsNeedingAppointments = () => {
+    return travelBookings.filter(booking => {
+      // Only confirmed bookings
+      if (booking.statut !== 'confirmed') return false;
+
+      // Check if booking has any appointment
+      const hasAppointment = appointments.some(appointment =>
+        appointment.travel_booking === booking.id
+      );
+
+      return !hasAppointment;
+    });
+  };
+
+  const bookingsNeedingAppointments = getBookingsNeedingAppointments();
+
+  const handleApprovePayment = async (paymentId) => {
+    try {
+      await axios.post(`/travel/api/payments/${paymentId}/approve_payment/`);
+      alert('Paiement approuvé avec succès');
+      window.location.reload(); // Reload page
+    } catch (error) {
+      console.error('Error approving payment:', error);
+      alert('Erreur lors de l\'approbation du paiement');
+    }
+  };
+
+  const handleRejectPayment = async (paymentId) => {
+    const reason = prompt('Motif du rejet:');
+    if (!reason) return;
+
+    try {
+      await axios.post(`/travel/api/payments/${paymentId}/reject_payment/`, { reason });
+      alert('Paiement rejeté');
+      window.location.reload(); // Reload page
+    } catch (error) {
+      console.error('Error rejecting payment:', error);
+      alert('Erreur lors du rejet du paiement');
+    }
+  };
+
+  const handleCreateAppointment = async (bookingId) => {
+    // Redirect to appointments page with booking pre-selected
+    window.location.href = `${AGENT_ROUTES.APPOINTMENTS}?booking=${bookingId}`;
+  };
+
 
   const alerts = [
     { id: 1, type: 'Document', message: 'Passeport de Jean Dupont expire dans 30 jours', priority: 'high', date: '2025-09-16' },
@@ -116,9 +198,11 @@ const AgentDashboard = () => {
                 type="search"
                 placeholder="Rechercher un client..."
                 className="pl-10 pr-4 w-full md:w-64"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Link to={ROUTES.AGENT_ROUTES.CASES}>
+            <Link to={AGENT_ROUTES.APPLICATIONS}>
               <Button className="gap-2">
                 Tous les dossiers
                 <ArrowRight className="h-4 w-4" />
@@ -128,8 +212,89 @@ const AgentDashboard = () => {
         </div>
       </section>
 
+      {/* Quick Actions */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Link to={AGENT_ROUTES.PAYMENTS_MANAGEMENT}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                    <FileText className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Valider Paiements</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Approuver les paiements clients</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to={AGENT_ROUTES.BOOKINGS_MANAGEMENT}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                    <Users className="h-6 w-6 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Gérer Réservations</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Valider les réservations payées</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to={AGENT_ROUTES.APPLICATIONS}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                    <Calendar className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Demandes Visa</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Traiter les demandes de visa</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to={AGENT_ROUTES.CLIENTS}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center mb-2">
+                    <MessageSquare className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Clients</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Gérer la base clients</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Paiements effectués
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <FileText className="mr-2 h-5 w-5 text-primary" />
+              <span className="text-2xl font-bold">{completedPayments.length}</span>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -138,12 +303,14 @@ const AgentDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <FileText className="mr-2 h-5 w-5 text-primary" />
-              <span className="text-2xl font-bold">{cases.length}</span>
+              <Users className="mr-2 h-5 w-5 text-primary" />
+              <span className="text-2xl font-bold">
+                {applications.filter(a => ['submitted', 'under_review', 'additional_info_required'].includes(a.status)).length}
+              </span>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -157,21 +324,7 @@ const AgentDashboard = () => {
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Alertes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Bell className="mr-2 h-5 w-5 text-primary" />
-              <span className="text-2xl font-bold">{alerts.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -196,7 +349,7 @@ const AgentDashboard = () => {
               <CardTitle>Dossiers récents</CardTitle>
               <CardDescription>Les derniers dossiers mis à jour</CardDescription>
             </div>
-            <Link to={ROUTES.AGENT_ROUTES.CASES}>
+            <Link to={AGENT_ROUTES.APPLICATIONS}>
               <Button variant="ghost" size="sm" className="gap-1">
                 Voir tout
                 <ArrowRight className="h-4 w-4" />
@@ -204,44 +357,262 @@ const AgentDashboard = () => {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Client</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Destination</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Statut</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Dernière mise à jour</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cases.map((caseItem) => (
-                    <tr key={caseItem.id} className="border-b border-gray-200 dark:border-gray-700">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">{caseItem.client}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{caseItem.type}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{caseItem.destination}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <Badge variant={getStatusVariant(caseItem.status)}>
-                          {caseItem.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(caseItem.lastUpdate).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link to={`${ROUTES.AGENT_ROUTES.CASES}/${caseItem.id}`}>
-                          <Button variant="ghost" size="sm">
-                            Détails
-                          </Button>
-                        </Link>
-                      </td>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Client</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Destination</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Statut</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Documents</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Créé le</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredApplications.slice(0, 5).map((application) => (
+                      <tr key={application.id} className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">{application.applicant_name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{application.visa_type_name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{application.country_name}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <Badge variant={getStatusVariant(application.status)}>
+                            {application.get_status_display}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          {application.documents_completed}/{application.total_documents}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          {new Date(application.created_at).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Link to={`applications/${application.id}`}>
+                            <Button variant="ghost" size="sm" className="gap-1">
+                              <Eye className="h-4 w-4" />
+                              Voir
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredApplications.length === 0 && !loading && (
+                  <div className="text-center py-8 text-gray-500">
+                    Aucune demande trouvée
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Bookings Needing Appointments */}
+        <Card className="md:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle>Réservations nécessitant un rendez-vous</CardTitle>
+              <CardDescription>Réservations validées qui n'ont pas encore de rendez-vous programmé</CardDescription>
             </div>
+            <Link to={AGENT_ROUTES.BOOKINGS_MANAGEMENT}>
+              <Button variant="ghost" size="sm" className="gap-1">
+                Voir réservations
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {bookingsNeedingAppointments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center mb-4">
+                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 font-medium">Toutes les réservations ont un rendez-vous</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                  Aucune réservation validée sans rendez-vous programmé
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {bookingsNeedingAppointments.slice(0, 3).map((booking) => (
+                  <div
+                    key={booking.id}
+                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-all duration-200 hover:border-primary/20"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                            <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              Réservation #{booking.id}
+                            </span>
+                            <Badge variant="success" className="text-xs">
+                              Confirmée
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {booking.user?.prenom} {booking.user?.nom} • {booking.destination}
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Créée le {new Date(booking.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {booking.ville_depart} → {booking.ville_arrivee}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {booking.nombre_passagers} passager{booking.nombre_passagers > 1 ? 's' : ''}
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleCreateAppointment(booking.id)}
+                          className="bg-blue-600 hover:bg-blue-700 gap-1 shadow-sm"
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Créer RDV
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {bookingsNeedingAppointments.length > 3 && (
+                  <div className="text-center pt-4">
+                    <Link to={AGENT_ROUTES.BOOKINGS_MANAGEMENT}>
+                      <Button variant="outline" className="gap-2">
+                        Voir toutes les réservations ({bookingsNeedingAppointments.length})
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Payments */}
+        <Card className="md:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle>Paiements en attente de validation</CardTitle>
+              <CardDescription>Paiements soumis par les clients nécessitant votre approbation</CardDescription>
+            </div>
+            <Link to={AGENT_ROUTES.PAYMENTS_MANAGEMENT}>
+              <Button variant="ghost" size="sm" className="gap-1">
+                Voir tout
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {pendingPayments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                  <FileText className="h-6 w-6 text-gray-400" />
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 font-medium">Aucun paiement en attente</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Les nouveaux paiements apparaîtront ici</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingPayments.slice(0, 3).map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-all duration-200 hover:border-primary/20"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-sm font-semibold text-gray-900 dark:text-white">
+                              {payment.reference}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {payment.payment_type === 'travel_booking' ? 'Réservation vol' :
+                               payment.payment_type === 'visa_application' ? 'Demande visa' : payment.payment_type}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {payment.user_name} • {new Date(payment.initiated_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-gray-900 dark:text-white">
+                            {payment.amount} {payment.currency}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(payment.initiated_at).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleApprovePayment(payment.id)}
+                            className="bg-green-600 hover:bg-green-700 gap-1 shadow-sm"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Approuver
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRejectPayment(payment.id)}
+                            className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 gap-1"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Rejeter
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {pendingPayments.length > 3 && (
+                  <div className="text-center pt-4">
+                    <Link to={AGENT_ROUTES.PAYMENTS_MANAGEMENT}>
+                      <Button variant="outline" className="gap-2">
+                        Voir tous les paiements ({pendingPayments.length})
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -252,7 +623,7 @@ const AgentDashboard = () => {
               <CardTitle>Rendez-vous à venir</CardTitle>
               <CardDescription>Vos prochains rendez-vous avec les clients</CardDescription>
             </div>
-            <Link to={ROUTES.AGENT_ROUTES.APPOINTMENTS}>
+            <Link to={AGENT_ROUTES.APPOINTMENTS}>
               <Button variant="ghost" size="sm" className="gap-1">
                 Voir tout
                 <ArrowRight className="h-4 w-4" />
@@ -299,7 +670,7 @@ const AgentDashboard = () => {
               <CardTitle>Alertes</CardTitle>
               <CardDescription>Notifications importantes nécessitant votre attention</CardDescription>
             </div>
-            <Link to={ROUTES.AGENT_ROUTES.ALERTS}>
+            <Link to={AGENT_ROUTES.ALERTS}>
               <Button variant="ghost" size="sm" className="gap-1">
                 Voir tout
                 <ArrowRight className="h-4 w-4" />
@@ -342,7 +713,7 @@ const AgentDashboard = () => {
             <CardTitle>Messages récents</CardTitle>
             <CardDescription>Communications avec vos clients</CardDescription>
           </div>
-          <Link to={ROUTES.AGENT_ROUTES.MESSAGES}>
+          <Link to={AGENT_ROUTES.MESSAGES}>
             <Button variant="ghost" size="sm" className="gap-1">
               Voir tout
               <ArrowRight className="h-4 w-4" />
