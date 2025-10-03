@@ -29,6 +29,7 @@ const AgentDashboard = () => {
   const [payments, setPayments] = useState([]);
   const [travelBookings, setTravelBookings] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [currencyExchanges, setCurrencyExchanges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,16 +41,18 @@ const AgentDashboard = () => {
   const loadApplications = async () => {
     try {
       setLoading(true);
-      const [applicationsResponse, paymentsResponse, bookingsResponse, appointmentsResponse] = await Promise.all([
+      const [applicationsResponse, paymentsResponse, bookingsResponse, appointmentsResponse, exchangesResponse] = await Promise.all([
         axios.get('/travel/api/visa-applications/'),
         axios.get('/travel/api/payments/'),
         axios.get('/travel/api/travel-bookings/'),
-        axios.get('/travel/api/appointments/')
+        axios.get('/travel/api/appointments/'),
+        axios.get('/travel/api/currency-exchanges/')
       ]);
       setApplications(applicationsResponse.data);
       setPayments(paymentsResponse.data);
       setTravelBookings(bookingsResponse.data);
       setAppointments(appointmentsResponse.data);
+      setCurrencyExchanges(exchangesResponse.data);
 
       // Debug: log payments data
       console.log('Payments data:', paymentsResponse.data);
@@ -277,6 +280,24 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
         </Link>
+
+        <Link to={AGENT_ROUTES.CURRENCY_EXCHANGES}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                    <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Échanges de devise</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Gérer les demandes d'échange</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Stats Cards */}
@@ -335,6 +356,24 @@ const AgentDashboard = () => {
             <div className="flex items-center">
               <MessageSquare className="mr-2 h-5 w-5 text-primary" />
               <span className="text-2xl font-bold">{messages.filter(m => !m.read).length}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Échanges en attente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <svg className="mr-2 h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-2xl font-bold">
+                {currencyExchanges.filter(e => ['pending', 'processing'].includes(e.status)).length}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -500,6 +539,123 @@ const AgentDashboard = () => {
                     <Link to={AGENT_ROUTES.BOOKINGS_MANAGEMENT}>
                       <Button variant="outline" className="gap-2">
                         Voir toutes les réservations ({bookingsNeedingAppointments.length})
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Currency Exchanges */}
+        <Card className="md:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle>Échanges de devise en attente</CardTitle>
+              <CardDescription>Demandes d'échange nécessitant votre validation ou traitement</CardDescription>
+            </div>
+            <Link to={AGENT_ROUTES.CURRENCY_EXCHANGES}>
+              <Button variant="ghost" size="sm" className="gap-1">
+                Voir tout
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {currencyExchanges.filter(e => ['pending', 'processing'].includes(e.status)).length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                  <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 font-medium">Aucun échange en attente</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Les nouvelles demandes apparaîtront ici</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {currencyExchanges.filter(e => ['pending', 'processing'].includes(e.status)).slice(0, 3).map((exchange) => (
+                  <div
+                    key={exchange.id}
+                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-all duration-200 hover:border-primary/20"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+                            <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-sm font-semibold text-gray-900 dark:text-white">
+                              {exchange.reference}
+                            </span>
+                            <Badge variant={exchange.status === 'pending' ? 'warning' : 'info'}>
+                              {exchange.status === 'pending' ? 'En attente' : 'En cours'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {exchange.user_name} • {new Date(exchange.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-gray-900 dark:text-white">
+                            {exchange.amount_sent} {exchange.from_currency}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            → {exchange.amount_received} {exchange.to_currency}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          {exchange.status === 'pending' && (
+                            <>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 gap-1 shadow-sm"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                Approuver
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 gap-1"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Rejeter
+                              </Button>
+                            </>
+                          )}
+                          {exchange.status === 'processing' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 gap-1 shadow-sm"
+                            >
+                              Terminer
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {currencyExchanges.filter(e => ['pending', 'processing'].includes(e.status)).length > 3 && (
+                  <div className="text-center pt-4">
+                    <Link to={AGENT_ROUTES.CURRENCY_EXCHANGES}>
+                      <Button variant="outline" className="gap-2">
+                        Voir tous les échanges ({currencyExchanges.filter(e => ['pending', 'processing'].includes(e.status)).length})
                         <ArrowRight className="h-4 w-4" />
                       </Button>
                     </Link>

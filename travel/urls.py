@@ -26,9 +26,22 @@ router.register(r'booking-status-history', views.BookingStatusHistoryViewSet, ba
 router.register(r'payments', views.PaymentViewSet, basename='payments')
 router.register(r'appointments', views.AppointmentViewSet, basename='appointments')
 
+# --- Currency Exchange Module ViewSets ---
+router.register(r'exchange-rates', views.ExchangeRateViewSet, basename='exchange-rates')
+router.register(r'currency-exchanges', views.CurrencyExchangeRequestViewSet, basename='currency-exchanges')
+router.register(r'notifications', views.NotificationViewSet, basename='notifications')
+
+# Add custom URL for exchange rate simulation
+exchange_rates_viewset = views.ExchangeRateViewSet.as_view({
+    'post': 'simulate_exchange'
+})
+
 urlpatterns = [
     # Page d'accueil simple de l'app Travel
     path("", lambda request: HttpResponse("Bienvenue dans le module Travel 🚀"), name="index"),
+    
+    # Add the new URL pattern for exchange rate simulation
+    path('exchange-rates/simulate_exchange/', exchange_rates_viewset, name='simulate-exchange'),
 
     # Endpoints générés par le router
     path("api/", include(router.urls)),

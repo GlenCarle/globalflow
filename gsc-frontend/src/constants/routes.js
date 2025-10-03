@@ -65,6 +65,12 @@ export const CLIENT_ROUTES = {
   INVOICES: '/dashboard/payments/invoices',
   INVOICE_DETAIL: '/dashboard/payments/invoices/:id',
 
+  // Currency Exchange
+  CURRENCY_EXCHANGE: '/dashboard/exchange',
+  CURRENCY_EXCHANGE_HISTORY: '/dashboard/exchange/history',
+  CURRENCY_EXCHANGE_DETAIL: '/dashboard/exchange/requests/:id',
+  CURRENCY_EXCHANGE_NEW: '/dashboard/exchange/new',
+
   // Checkout
   CHECKOUT: '/dashboard/checkout',
   CHECKOUT_CONFIRMATION: '/dashboard/checkout/confirmation',
@@ -106,10 +112,13 @@ export const AGENT_ROUTES = {
   ALERTS: '/agent/alerts',
   NOTIFICATIONS: '/agent/notifications',
   
+  // Currency Exchange
+  CURRENCY_EXCHANGES: '/agent/currency-exchanges',
+
   // Reports
   REPORTS: '/agent/reports',
   PERFORMANCE: '/agent/performance',
-  
+
   // Settings
   SETTINGS: '/agent/settings',
   PROFILE: '/agent/profile',
@@ -125,6 +134,7 @@ export const ADMIN_ROUTES = {
   AGENT_DETAIL: '/admin/agents/:id',
   SERVICES: '/admin/services',
   SERVICE_DETAIL: '/admin/services/:id',
+  EXCHANGE_RATES: '/admin/exchange-rates',
   REPORTS: '/admin/reports',
   SETTINGS: '/admin/settings',
 };
