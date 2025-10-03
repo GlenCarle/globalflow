@@ -296,14 +296,17 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     initialized,
-    
+
+    // API instance
+    api,
+
     // Authentication methods
     login,
     logout,
     register,
     refreshToken,
     updateProfile, // Make sure updateProfile is included
-    
+
     // Role-based helpers
     hasRole,
     hasAnyRole,

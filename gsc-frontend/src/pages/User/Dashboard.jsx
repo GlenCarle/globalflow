@@ -10,7 +10,8 @@ import {
   ArrowRight,
   Clock,
   AlertTriangle,
-  Plus
+  Plus,
+  DollarSign
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -23,6 +24,8 @@ const UserDashboard = () => {
   const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [currencyExchanges, setCurrencyExchanges] = useState([]);
+  const [exchangeRates, setExchangeRates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -33,12 +36,16 @@ const UserDashboard = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [applicationsResponse, appointmentsResponse] = await Promise.all([
+      const [applicationsResponse, appointmentsResponse, exchangesResponse, ratesResponse] = await Promise.all([
         axios.get('/travel/api/visa-applications/'),
-        axios.get('/travel/api/appointments/')
+        axios.get('/travel/api/appointments/'),
+        axios.get('/travel/api/currency-exchanges/'),
+        axios.get('/travel/api/exchange-rates/current_rates/')
       ]);
       setApplications(applicationsResponse.data);
       setAppointments(appointmentsResponse.data);
+      setCurrencyExchanges(exchangesResponse.data);
+      setExchangeRates(ratesResponse.data);
     } catch (error) {
       console.error('Error loading data:', error);
       setError('Erreur lors du chargement des données');
@@ -108,12 +115,18 @@ const UserDashboard = () => {
                 Nouvelle demande de visa
               </Button>
             </Link>
+            <Link to="/currency-exchange">
+              <Button variant="outline" className="gap-2">
+                <DollarSign className="h-4 w-4" />
+                Échanger de la devise
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -171,10 +184,26 @@ const UserDashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Échanges de devise
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <DollarSign className="mr-2 h-5 w-5 text-primary" />
+              <span className="text-2xl font-bold">
+                {currencyExchanges.filter(e => ['pending', 'processing'].includes(e.status)).length}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Applications */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -426,6 +455,112 @@ const UserDashboard = () => {
                   Vous n'avez pas de messages
                 </p>
                 <Button>Contacter un agent</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Currency Exchange Rates */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle>Taux de change actuels</CardTitle>
+              <CardDescription>Taux de référence pour vos échanges</CardDescription>
+            </div>
+            <Link to="/currency-exchange">
+              <Button variant="ghost" size="sm" className="gap-1">
+                Échanger
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : exchangeRates.length > 0 ? (
+              <div className="space-y-3">
+                {exchangeRates.slice(0, 4).map((rate) => (
+                  <div key={`${rate.from_currency}-${rate.to_currency}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-medium">
+                        {rate.from_currency} → {rate.to_currency}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">{Number(rate.rate).toFixed(4)}</div>
+                      <div className="text-xs text-gray-500">
+                        Mis à jour: {new Date(rate.updated_at).toLocaleDateString('fr-FR')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                <p>Aucun taux de change disponible</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Currency Exchanges */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle>Échanges de devise</CardTitle>
+              <CardDescription>Vos demandes d'échange de monnaie</CardDescription>
+            </div>
+            <Link to="/currency-exchanges">
+              <Button variant="ghost" size="sm" className="gap-1">
+                Voir tout
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {currencyExchanges.length > 0 ? (
+              <div className="space-y-4">
+                {currencyExchanges.slice(0, 3).map((exchange) => (
+                  <div key={exchange.id} className="flex items-start justify-between rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{exchange.reference}</h3>
+                        <Badge variant={getStatusVariant(exchange.status)}>
+                          {exchange.status_display}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {exchange.amount_sent} {exchange.from_currency} → {exchange.amount_received} {exchange.to_currency}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                        <Clock className="mr-1 h-4 w-4" />
+                        Créé le: {new Date(exchange.created_at).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    {exchange.status === 'completed' && exchange.receipt_pdf && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(exchange.receipt_pdf, '_blank')}
+                      >
+                        Reçu PDF
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <DollarSign className="mb-2 h-10 w-10 text-gray-400" />
+                <h3 className="mb-1 font-medium">Aucun échange</h3>
+                <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                  Vous n'avez pas encore d'échange de devise
+                </p>
+                <Link to="/currency-exchange">
+                  <Button>Échanger de la devise</Button>
+                </Link>
               </div>
             )}
           </CardContent>

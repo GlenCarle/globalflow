@@ -651,3 +651,212 @@ class Appointment(models.Model):
         verbose_name = "Rendez-vous"
         verbose_name_plural = "Rendez-vous"
         ordering = ['-date']
+
+# === CURRENCY EXCHANGE MODULE ===
+
+class ExchangeRate(models.Model):
+    """
+    Model for managing currency exchange rates
+    """
+    CURRENCIES = [
+        ('XAF', 'Franc CFA'),
+        ('USD', 'Dollar américain'),
+        ('EUR', 'Euro'),
+        ('CAD', 'Dollar canadien'),
+        ('GBP', 'Livre sterling'),
+        ('CHF', 'Franc suisse'),
+        ('JPY', 'Yen japonais'),
+        ('CNY', 'Yuan chinois'),
+        ('NGN', 'Naira nigérian'),
+        ('GHS', 'Cedi ghanéen'),
+        ('ZAR', 'Rand sud-africain'),
+    ]
+
+    from_currency = models.CharField(max_length=3, choices=CURRENCIES, verbose_name="Devise source")
+    to_currency = models.CharField(max_length=3, choices=CURRENCIES, verbose_name="Devise cible")
+    rate = models.DecimalField(max_digits=12, decimal_places=6, verbose_name="Taux de change")
+    fee_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=2.00, verbose_name="Frais (%)")
+    fee_fixed = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Frais fixe")
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
+    valid_from = models.DateTimeField(auto_now_add=True, verbose_name="Valide depuis")
+    valid_until = models.DateTimeField(null=True, blank=True, verbose_name="Valide jusqu'à")
+
+    class Meta:
+        verbose_name = "Taux de change"
+        verbose_name_plural = "Taux de change"
+        unique_together = ['from_currency', 'to_currency', 'valid_from']
+        ordering = ['-valid_from']
+
+    def __str__(self):
+        return f"{self.from_currency} → {self.to_currency}: {self.rate}"
+
+    @property
+    def is_current(self):
+        """Check if this rate is currently valid"""
+        from django.utils import timezone
+        now = timezone.now()
+        if self.valid_until:
+            return self.valid_from <= now <= self.valid_until
+        return self.valid_from <= now
+
+
+class CurrencyExchangeRequest(models.Model):
+    """
+    Model for currency exchange requests
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Brouillon'),
+        ('pending', 'En attente'),
+        ('processing', 'En cours de traitement'),
+        ('completed', 'Effectué'),
+        ('cancelled', 'Annulé'),
+        ('rejected', 'Refusé'),
+    ]
+
+    RECEPTION_METHODS = [
+        ('agency_pickup', 'Retrait en agence'),
+        ('bank_transfer', 'Virement bancaire'),
+        ('mobile_money', 'Mobile Money'),
+    ]
+
+    # Basic information
+    user = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='currency_exchanges', verbose_name="Client")
+    reference = models.CharField(max_length=50, unique=True, blank=True, verbose_name="Référence")
+
+    # Exchange details
+    from_currency = models.CharField(max_length=3, choices=ExchangeRate.CURRENCIES, verbose_name="Devise à échanger")
+    to_currency = models.CharField(max_length=3, choices=ExchangeRate.CURRENCIES, verbose_name="Devise à recevoir")
+    amount_sent = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant à envoyer")
+    exchange_rate = models.DecimalField(max_digits=12, decimal_places=6, verbose_name="Taux appliqué")
+    fee_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Frais")
+    amount_received = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant net à recevoir")
+
+    # Reception method and details
+    reception_method = models.CharField(max_length=20, choices=RECEPTION_METHODS, verbose_name="Mode de réception")
+
+    # Agency pickup details
+    pickup_agency = models.CharField(max_length=100, blank=True, verbose_name="Agence de retrait")
+
+    # Bank transfer details
+    bank_name = models.CharField(max_length=100, blank=True, verbose_name="Nom de la banque")
+    account_holder_name = models.CharField(max_length=100, blank=True, verbose_name="Titulaire du compte")
+    iban = models.CharField(max_length=34, blank=True, verbose_name="IBAN/RIB")
+    bic = models.CharField(max_length=11, blank=True, verbose_name="BIC/SWIFT")
+
+    # Mobile money details
+    mobile_operator = models.CharField(max_length=50, blank=True, verbose_name="Opérateur mobile")
+    mobile_number = models.CharField(max_length=20, blank=True, verbose_name="Numéro mobile")
+
+    # Status and tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Statut")
+    assigned_agent = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='assigned_exchanges', verbose_name="Agent assigné")
+
+    # Notes
+    client_notes = models.TextField(blank=True, verbose_name="Notes client")
+    internal_notes = models.TextField(blank=True, verbose_name="Notes internes")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Dernière mise à jour")
+    submitted_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de soumission")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Date d'exécution")
+
+    # PDF receipt
+    receipt_pdf = models.FileField(upload_to='exchange_receipts/', null=True, blank=True, verbose_name="Reçu PDF")
+
+    class Meta:
+        verbose_name = "Demande d'échange de devise"
+        verbose_name_plural = "Demandes d'échange de devise"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.reference} - {self.user.get_full_name()} - {self.amount_sent} {self.from_currency}"
+
+    def save(self, *args, **kwargs):
+        if not self.reference and self.status != 'draft':
+            # Generate reference
+            import uuid
+            self.reference = f"EX-{uuid.uuid4().hex[:8].upper()}"
+
+        # Calculate amounts if not set
+        if not self.amount_received and self.amount_sent and self.exchange_rate:
+            gross_received = self.amount_sent * self.exchange_rate
+            self.amount_received = gross_received - self.fee_amount
+
+        super().save(*args, **kwargs)
+
+
+class ExchangeStatusHistory(models.Model):
+    """
+    Model for tracking currency exchange status changes
+    """
+    ACTION_CHOICES = [
+        ('created', 'Créé'),
+        ('submitted', 'Soumis'),
+        ('status_changed', 'Statut modifié'),
+        ('assigned', 'Assigné à un agent'),
+        ('completed', 'Effectué'),
+        ('cancelled', 'Annulé'),
+        ('rejected', 'Refusé'),
+        ('notes_added', 'Notes ajoutées'),
+    ]
+
+    exchange_request = models.ForeignKey(CurrencyExchangeRequest, on_delete=models.CASCADE, related_name='status_history')
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, blank=True)
+    notes = models.TextField(blank=True)
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    performed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Historique d'échange"
+        verbose_name_plural = "Historiques d'échange"
+        ordering = ['-performed_at']
+
+    def __str__(self):
+        return f"{self.exchange_request.reference} - {self.get_action_display()} - {self.performed_at}"
+
+# === NOTIFICATION SYSTEM ===
+
+class Notification(models.Model):
+    """
+    Model for user notifications
+    """
+    NOTIFICATION_TYPES = [
+        ('exchange_status', 'Changement de statut d\'échange'),
+        ('exchange_completed', 'Échange terminé'),
+        ('appointment_reminder', 'Rappel de rendez-vous'),
+        ('document_required', 'Document requis'),
+        ('general', 'Général'),
+    ]
+
+    user = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='notifications', verbose_name="Utilisateur")
+    title = models.CharField(max_length=200, verbose_name="Titre")
+    message = models.TextField(verbose_name="Message")
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='general', verbose_name="Type")
+    is_read = models.BooleanField(default=False, verbose_name="Lu")
+    related_exchange = models.ForeignKey(CurrencyExchangeRequest, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='notifications', verbose_name="Échange lié")
+    related_appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True,
+                                          related_name='notifications', verbose_name="Rendez-vous lié")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    read_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de lecture")
+
+    class Meta:
+        verbose_name = "Notification"
+        verbose_name_plural = "Notifications"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.title}"
+
+    def mark_as_read(self):
+        """Mark notification as read"""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save()

@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  ChevronDown, 
-  ChevronRight, 
-  Home, 
-  Users, 
-  FileText, 
-  Calendar, 
-  Briefcase, 
-  Settings, 
-  LogOut, 
-  Menu, 
+import {
+  ChevronDown,
+  ChevronRight,
+  Home,
+  Users,
+  FileText,
+  Calendar,
+  Briefcase,
+  Settings,
+  LogOut,
+  Menu,
   X,
   PlaneTakeoff,
   CreditCard,
   MessageSquare,
   Bell,
   FileCheck,
-  UserCog
+  UserCog,
+  DollarSign
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -68,6 +69,11 @@ const Sidebar = ({ className }) => {
         title: 'Paiements',
         icon: <CreditCard className="h-5 w-5" />,
         href: '/dashboard/payments',
+      },
+      {
+        title: 'Échanges de devise',
+        icon: <DollarSign className="h-5 w-5" />,
+        href: '/currency-exchanges',
       },
       {
         title: 'Profil',

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -15,7 +16,8 @@ from .models import (
     Country, VisaType, RequiredDocument, VisaApplication,
     ApplicationDocument, ApplicationHistory,
     DossierVoyage, DocumentVoyage,
-    TravelBooking, Passenger, TravelDocument, BookingStatusHistory, Payment, Appointment
+    TravelBooking, Passenger, TravelDocument, BookingStatusHistory, Payment, Appointment,
+    ExchangeRate, CurrencyExchangeRequest, ExchangeStatusHistory, Notification
 )
 from .serializers import (
     CountrySerializer, VisaTypeSerializer, RequiredDocumentSerializer,
@@ -24,7 +26,9 @@ from .serializers import (
     ApplicationHistorySerializer,
     DossierVoyageSerializer, DocumentVoyageSerializer,
     TravelBookingSerializer, PassengerSerializer, TravelDocumentSerializer, BookingStatusHistorySerializer,
-    PaymentSerializer, PaymentCreateSerializer, AppointmentSerializer, AppointmentListSerializer
+    PaymentSerializer, PaymentCreateSerializer, AppointmentSerializer, AppointmentListSerializer,
+    NotificationSerializer, ExchangeRateSerializer, CurrencyExchangeRequestSerializer,
+    CurrencyExchangeRequestCreateSerializer, CurrencyExchangeRequestListSerializer, ExchangeStatusHistorySerializer
 )
 
 # Page d'accueil simple
@@ -441,6 +445,340 @@ class ApplicationDocumentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(document)
         return Response(serializer.data)
+
+# === CURRENCY EXCHANGE VIEWS ===
+
+class ExchangeRateViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing exchange rates (admin only)
+    """
+    queryset = ExchangeRate.objects.all().order_by('-valid_from')
+    serializer_class = ExchangeRateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'profile') and user.profile.role in ['agent', 'admin']:
+            return ExchangeRate.objects.all()
+        return ExchangeRate.objects.filter(is_active=True)
+
+    @action(detail=False, methods=['get'])
+    def current_rates(self, request):
+        """Get current active exchange rates"""
+        rates = ExchangeRate.objects.filter(is_active=True).order_by('from_currency', 'to_currency')
+        serializer = self.get_serializer(rates, many=True)
+        return Response(serializer.data)
+        
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def simulate_exchange(self, request):
+        """
+        Simulate a currency exchange with the given amount and currencies.
+        Expected POST data:
+        {
+            "from_currency": "USD",
+            "to_currency": "EUR",
+            "amount": 100.00
+        }
+        """
+        from_currency = request.data.get('from_currency')
+        to_currency = request.data.get('to_currency')
+        amount = request.data.get('amount')
+        
+        if not all([from_currency, to_currency, amount]):
+            return Response(
+                {"error": "Missing required fields: from_currency, to_currency, and amount are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                raise ValueError("Amount must be a positive number")
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Invalid amount. Must be a positive number"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Try to find a direct exchange rate
+        try:
+            rate = ExchangeRate.objects.filter(
+                from_currency=from_currency.upper(),
+                to_currency=to_currency.upper(),
+                is_active=True
+            ).latest('valid_from')
+            
+            converted_amount = amount * rate.rate
+            
+            return Response({
+                'from_currency': from_currency.upper(),
+                'to_currency': to_currency.upper(),
+                'amount': float(amount),
+                'rate': float(rate.rate),
+                'converted_amount': float(converted_amount),
+                'last_updated': rate.updated_at
+            })
+            
+        except ExchangeRate.DoesNotExist:
+            # If no direct rate, check for a reverse rate
+            try:
+                reverse_rate = ExchangeRate.objects.filter(
+                    from_currency=to_currency.upper(),
+                    to_currency=from_currency.upper(),
+                    is_active=True
+                ).latest('valid_from')
+                
+                converted_amount = amount / reverse_rate.rate
+                
+                return Response({
+                    'from_currency': from_currency.upper(),
+                    'to_currency': to_currency.upper(),
+                    'amount': float(amount),
+                    'rate': 1.0 / float(reverse_rate.rate),
+                    'converted_amount': float(converted_amount),
+                    'last_updated': reverse_rate.updated_at
+                })
+                
+            except ExchangeRate.DoesNotExist:
+                return Response(
+                    {"error": f"No exchange rate found for {from_currency.upper()} to {to_currency.upper()} (direct or reverse)"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+
+        try:
+            rate_obj = ExchangeRate.objects.filter(
+                from_currency=from_currency,
+                to_currency=to_currency,
+                is_active=True
+            ).latest('valid_from')
+
+            amount = Decimal(str(amount))
+            gross_received = amount * rate_obj.rate
+            fee = (gross_received * rate_obj.fee_percentage / 100) + rate_obj.fee_fixed
+            net_received = gross_received - fee
+
+            return Response({
+                'from_currency': from_currency,
+                'to_currency': to_currency,
+                'amount_sent': amount,
+                'exchange_rate': rate_obj.rate,
+                'fee_percentage': rate_obj.fee_percentage,
+                'fee_fixed': rate_obj.fee_fixed,
+                'fee_amount': fee,
+                'gross_received': gross_received,
+                'net_received': net_received
+            })
+        except ExchangeRate.DoesNotExist:
+            return Response({'error': 'Exchange rate not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CurrencyExchangeRequestViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for currency exchange requests
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'profile') and user.profile.role == 'client':
+            return CurrencyExchangeRequest.objects.filter(user=user.profile.client)
+        elif hasattr(user, 'profile') and user.profile.role in ['agent', 'admin']:
+            return CurrencyExchangeRequest.objects.all()
+        return CurrencyExchangeRequest.objects.none()
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return CurrencyExchangeRequestListSerializer
+        elif self.action == 'create':
+            return CurrencyExchangeRequestCreateSerializer
+        return CurrencyExchangeRequestSerializer
+
+    def perform_create(self, serializer):
+        exchange_request = serializer.save()
+
+        # Create initial status history
+        ExchangeStatusHistory.objects.create(
+            exchange_request=exchange_request,
+            action='created',
+            new_status='pending',
+            performed_by=self.request.user if self.request.user.is_authenticated else None,
+            notes='Demande créée'
+        )
+
+
+    @action(detail=True, methods=['post'])
+    def change_status(self, request, pk=None):
+        """Change exchange request status (agent only)"""
+        exchange_request = self.get_object()
+        new_status = request.data.get('status')
+        notes = request.data.get('notes', '')
+
+        if request.user.profile.role not in ['agent', 'admin']:
+            return Response({'error': 'Permission refusée'}, status=status.HTTP_403_FORBIDDEN)
+
+        if new_status not in dict(CurrencyExchangeRequest.STATUS_CHOICES):
+            return Response({'error': 'Statut invalide'}, status=status.HTTP_400_BAD_REQUEST)
+
+        old_status = exchange_request.status
+        exchange_request.status = new_status
+
+        if new_status == 'completed':
+            exchange_request.completed_at = timezone.now()
+        elif new_status in ['cancelled', 'rejected']:
+            exchange_request.completed_at = timezone.now()
+
+        exchange_request.save()
+
+        # Create status history
+        ExchangeStatusHistory.objects.create(
+            exchange_request=exchange_request,
+            action='status_changed',
+            old_status=old_status,
+            new_status=new_status,
+            performed_by=request.user,
+            notes=notes
+        )
+
+        # Create notification for the client
+        notification_title = f"Échange {exchange_request.reference} - Statut mis à jour"
+        notification_message = f"Votre demande d'échange de devise {exchange_request.reference} est maintenant {exchange_request.get_status_display()}."
+
+        if new_status == 'completed':
+            notification_title = f"Échange {exchange_request.reference} - Terminé"
+            notification_message = f"Votre échange de devise {exchange_request.reference} a été effectué avec succès. Vous pouvez télécharger votre reçu."
+        elif new_status == 'rejected':
+            notification_title = f"Échange {exchange_request.reference} - Refusé"
+            notification_message = f"Votre demande d'échange de devise {exchange_request.reference} a été refusée."
+
+        Notification.objects.create(
+            user=exchange_request.user,
+            title=notification_title,
+            message=notification_message,
+            notification_type='exchange_status',
+            related_exchange=exchange_request
+        )
+
+        serializer = self.get_serializer(exchange_request)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def assign_agent(self, request, pk=None):
+        """Assign agent to exchange request (admin only)"""
+        exchange_request = self.get_object()
+        agent_id = request.data.get('agent_id')
+
+        if request.user.profile.role not in ['admin']:
+            return Response({'error': 'Seul un administrateur peut assigner un agent'}, status=status.HTTP_403_FORBIDDEN)
+
+        from django.contrib.auth.models import User
+        try:
+            agent = User.objects.get(id=agent_id, profile__role='agent')
+            exchange_request.assigned_agent = agent
+            exchange_request.save()
+
+            ExchangeStatusHistory.objects.create(
+                exchange_request=exchange_request,
+                action='assigned',
+                performed_by=request.user,
+                notes=f'Assigné à l\'agent {agent.get_full_name()}'
+            )
+
+            serializer = self.get_serializer(exchange_request)
+            return Response(serializer.data)
+        except User.DoesNotExist:
+            return Response({'error': 'Agent non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        """Generate PDF receipt for completed exchange"""
+        exchange_request = self.get_object()
+
+        if exchange_request.status != 'completed':
+            return Response({'error': 'Le reçu ne peut être généré que pour les échanges effectués'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Title
+        title = Paragraph(f"Reçu d'échange de devise - {exchange_request.reference}", styles['Title'])
+        story.append(title)
+        story.append(Spacer(1, 12))
+
+        # Exchange details
+        story.append(Paragraph("Détails de l'échange", styles['Heading2']))
+        details_data = [
+            ['Référence', exchange_request.reference],
+            ['Client', exchange_request.user.get_full_name()],
+            ['Date', exchange_request.completed_at.strftime('%d/%m/%Y %H:%M')],
+            ['Devise envoyée', f"{exchange_request.amount_sent} {exchange_request.from_currency}"],
+            ['Devise reçue', f"{exchange_request.amount_received} {exchange_request.to_currency}"],
+            ['Taux appliqué', f"{exchange_request.exchange_rate}"],
+            ['Frais', f"{exchange_request.fee_amount} {exchange_request.to_currency}"],
+            ['Mode de réception', exchange_request.get_reception_method_display()],
+        ]
+
+        # Add reception details
+        if exchange_request.reception_method == 'agency_pickup':
+            details_data.append(['Agence de retrait', exchange_request.pickup_agency])
+        elif exchange_request.reception_method == 'bank_transfer':
+            details_data.extend([
+                ['Banque', exchange_request.bank_name],
+                ['Titulaire', exchange_request.account_holder_name],
+                ['IBAN', exchange_request.iban],
+            ])
+        elif exchange_request.reception_method == 'mobile_money':
+            details_data.extend([
+                ['Opérateur', exchange_request.mobile_operator],
+                ['Numéro', exchange_request.mobile_number],
+            ])
+
+        details_table = Table(details_data, colWidths=[120, 250])
+        details_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(details_table)
+        story.append(Spacer(1, 12))
+
+        # Important notice
+        story.append(Paragraph("AVIS IMPORTANT", styles['Heading2']))
+        notice_text = """
+        Cet échange de devise est simulé et ne constitue pas une transaction financière réelle.
+        Aucun paiement n'a été effectué sur la plateforme. Ce document est fourni à titre informatif uniquement.
+        """
+        story.append(Paragraph(notice_text, styles['Normal']))
+        story.append(Spacer(1, 12))
+
+        # Agent signature
+        if exchange_request.assigned_agent:
+            story.append(Paragraph(f"Traitée par: {exchange_request.assigned_agent.get_full_name()}", styles['Normal']))
+
+        # Footer
+        story.append(Spacer(1, 20))
+        story.append(Paragraph("GSC - Agence d'immigration", styles['Normal']))
+        story.append(Paragraph(f"Généré le {timezone.now().strftime('%d/%m/%Y à %H:%M')}", styles['Normal']))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        # Save PDF to model
+        filename = f"exchange_receipt_{exchange_request.reference}.pdf"
+        exchange_request.receipt_pdf.save(filename, BytesIO(buffer.getvalue()))
+
+        # Return PDF response
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):
@@ -1099,6 +1437,41 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(payment)
         return Response(serializer.data)
+
+# === NOTIFICATION SYSTEM ===
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing user notifications
+    """
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'profile') and user.profile.role == 'client':
+            return Notification.objects.filter(user=user.profile.client)
+        elif hasattr(user, 'profile') and user.profile.role in ['agent', 'admin']:
+            return Notification.objects.all()
+        return Notification.objects.none()
+
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """Mark notification as read"""
+        notification = self.get_object()
+        notification.mark_as_read()
+        return Response({'message': 'Notification marquée comme lue'})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_as_read(self, request):
+        """Mark all user notifications as read"""
+        user = request.user
+        if hasattr(user, 'profile') and user.profile.role == 'client':
+            Notification.objects.filter(user=user.profile.client, is_read=False).update(
+                is_read=True,
+                read_at=timezone.now()
+            )
+        return Response({'message': 'Toutes les notifications ont été marquées comme lues'})
 
 # Appointment ViewSet
 class AppointmentViewSet(viewsets.ModelViewSet):

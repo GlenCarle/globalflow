@@ -4,7 +4,8 @@ from .models import (
     Country, VisaType, RequiredDocument, VisaApplication,
     ApplicationDocument, ApplicationHistory,
     DossierVoyage, DocumentVoyage,
-    TravelBooking, Passenger, TravelDocument, BookingStatusHistory, Payment, Appointment
+    TravelBooking, Passenger, TravelDocument, BookingStatusHistory, Payment, Appointment,
+    ExchangeRate, CurrencyExchangeRequest, ExchangeStatusHistory, Notification
 )
 
 # Country Serializer
@@ -454,10 +455,10 @@ class PaymentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = [
-            'payment_type', 'amount', 'currency', 'payment_method',
-            'travel_booking', 'visa_application', 'description'
+            'id', 'payment_type', 'amount', 'currency', 'payment_method',
+            'travel_booking', 'visa_application', 'description', 'reference'
         ]
-        read_only_fields = ['reference']
+        read_only_fields = ['id', 'reference']
 
     # Validation will be handled in the ViewSet
 
@@ -512,3 +513,101 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     def get_is_upcoming(self, obj):
         from django.utils import timezone
         return obj.date > timezone.now()
+
+# === NOTIFICATION SERIALIZERS ===
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'read_at']
+
+# === CURRENCY EXCHANGE SERIALIZERS ===
+
+class ExchangeRateSerializer(serializers.ModelSerializer):
+    from_currency_display = serializers.CharField(source='get_from_currency_display', read_only=True)
+    to_currency_display = serializers.CharField(source='get_to_currency_display', read_only=True)
+
+    class Meta:
+        model = ExchangeRate
+        fields = '__all__'
+        read_only_fields = ['id', 'valid_from']
+
+
+class CurrencyExchangeRequestSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    from_currency_display = serializers.CharField(source='get_from_currency_display', read_only=True)
+    to_currency_display = serializers.CharField(source='get_to_currency_display', read_only=True)
+    reception_method_display = serializers.CharField(source='get_reception_method_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    assigned_agent_name = serializers.CharField(source='assigned_agent.get_full_name', read_only=True)
+    status_history = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CurrencyExchangeRequest
+        fields = '__all__'
+        read_only_fields = ['id', 'reference', 'created_at', 'updated_at', 'submitted_at', 'completed_at', 'receipt_pdf']
+
+    def get_status_history(self, obj):
+        from .models import ExchangeStatusHistory
+        history = ExchangeStatusHistory.objects.filter(exchange_request=obj).order_by('-performed_at')[:5]
+        return ExchangeStatusHistorySerializer(history, many=True).data
+
+
+class CurrencyExchangeRequestCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CurrencyExchangeRequest
+        fields = [
+            'reference', 'from_currency', 'to_currency', 'amount_sent', 'reception_method',
+            'pickup_agency', 'bank_name', 'account_holder_name', 'iban', 'bic',
+            'mobile_operator', 'mobile_number', 'client_notes'
+        ]
+
+    def create(self, validated_data):
+        # Set user from request
+        validated_data['user'] = self.context['request'].user.profile.client
+
+        # Get current exchange rate
+        from .models import ExchangeRate
+        try:
+            rate_obj = ExchangeRate.objects.filter(
+                from_currency=validated_data['from_currency'],
+                to_currency=validated_data['to_currency'],
+                is_active=True
+            ).latest('valid_from')
+            validated_data['exchange_rate'] = rate_obj.rate
+            validated_data['fee_amount'] = (validated_data['amount_sent'] * rate_obj.rate * rate_obj.fee_percentage / 100) + rate_obj.fee_fixed
+        except ExchangeRate.DoesNotExist:
+            raise serializers.ValidationError("Taux de change non disponible pour cette paire de devises")
+
+        return super().create(validated_data)
+
+
+class CurrencyExchangeRequestListSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    from_currency_display = serializers.CharField(source='get_from_currency_display', read_only=True)
+    to_currency_display = serializers.CharField(source='get_to_currency_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    days_since_created = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CurrencyExchangeRequest
+        fields = [
+            'id', 'reference', 'user', 'user_name', 'from_currency', 'from_currency_display',
+            'to_currency', 'to_currency_display', 'amount_sent', 'amount_received',
+            'status', 'status_display', 'created_at', 'submitted_at', 'days_since_created'
+        ]
+
+    def get_days_since_created(self, obj):
+        from django.utils import timezone
+        return (timezone.now().date() - obj.created_at.date()).days
+
+
+class ExchangeStatusHistorySerializer(serializers.ModelSerializer):
+    performed_by_name = serializers.CharField(source='performed_by.get_full_name', read_only=True)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = ExchangeStatusHistory
+        fields = '__all__'
+        read_only_fields = ['id', 'performed_at']
