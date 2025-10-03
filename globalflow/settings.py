@@ -135,7 +135,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'globalflow',
         'USER': 'postgres',
-        'PASSWORD': 'admin-postgres',
+        'PASSWORD': 'postgresql',
         'HOST': 'localhost',
         'PORT': '5432',
     }
