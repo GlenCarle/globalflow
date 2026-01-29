@@ -51,12 +51,12 @@ const Contact = () => {
     {
       icon: <Phone className="h-6 w-6 text-primary" />,
       title: 'Téléphone',
-      details: ['+33 1 23 45 67 89', '+33 6 12 34 56 78']
+      details: ['+237 6 23 45 67 89', '+237 6 12 34 56 78']
     },
     {
       icon: <Mail className="h-6 w-6 text-primary" />,
       title: 'Email',
-      details: ['contact@gsc-immigration.fr', 'support@gsc-immigration.fr']
+      details: ['globalservice11@gmail.com', 'support@gsc-immigration.fr']
     },
     {
       icon: <Clock className="h-6 w-6 text-primary" />,

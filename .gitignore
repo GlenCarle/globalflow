@@ -20,7 +20,7 @@ staticfiles/
 .coverage
 htmlcov/
 .pytest_cache/
-migrations/
+# migrations/
 
 # Frontend (React/Vite)
 node_modules/
@@ -92,3 +92,10 @@ yarn-error.log*
 
 # Vite
 .vite/
+
+.venv
+__pycache__/
+*.pyc
+db.sqlite3
+.env
+staticfiles/

@@ -26,7 +26,8 @@ SECRET_KEY = 'django-insecure-m!ho)6)!^lcqk#lk7f2w37b25juy499n5n38(uqv@!)ly+2rf_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'localhost:3000']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'localhost:3000', '*']
+
 
 
 # Application definition
@@ -105,6 +106,7 @@ MIDDLEWARE = [
 
     'corsheaders.middleware.CorsMiddleware',  # Middleware pour CORS
     'django.middleware.common.CommonMiddleware',  # Middleware pour les requêtes HTTP
+    "whitenoise.middleware.WhiteNoiseMiddleware",
 ]
 
 ROOT_URLCONF = 'globalflow.urls'
@@ -178,6 +180,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'static'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Media files (Uploaded files)
 MEDIA_URL = '/media/'
